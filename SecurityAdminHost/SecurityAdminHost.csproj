@@ -1,17 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
 
-  <ItemGroup>
-    <ProjectReference Include="C:\Users\Masum Billah\source\repos\SecurityAdmin\securityadmin.esproj" />
-  </ItemGroup>
+		<!-- React Project Path -->
+		<SpaRoot>..\securityadmin\</SpaRoot>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="C:\Users\Masum Billah\source\repos\SecurityAdmin\securityadmin.esproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" />
+	</ItemGroup>
+
+	<!-- Auto Start React -->
+	<Target Name="StartReactDevServer"
+			BeforeTargets="Build"
+			Condition="'$(Configuration)' == 'Debug'">
+
+		<Exec WorkingDirectory="$(SpaRoot)"
+			  Command="cmd /c start npm run dev" />
+
+	</Target>
 
 </Project>
