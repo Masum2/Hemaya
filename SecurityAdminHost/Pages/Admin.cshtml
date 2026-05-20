@@ -1,0 +1,24 @@
+@page "/admin/{**path}"
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <base href="/admin/" />
+    <title>Admin Panel</title>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="module">
+        import RefreshRuntime from 'http://localhost:54080/@@react-refresh'
+        RefreshRuntime.injectIntoGlobalHook(window)
+        window.$RefreshReg$ = () => {}
+        window.$RefreshSig$ = () => (type) => type
+        window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+    <script type="module" src="http://localhost:54080/@@vite/client"></script>
+    <script type="module" src="http://localhost:54080/src/main.tsx"></script>
+</body>
+</html>
