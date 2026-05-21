@@ -1,12 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useGetModuleList } from '../api-hooks/user-modules-hooks/useGetModuleList';
-import { useEditModuleRole } from '../api-hooks/user-modules-hooks/useEditModuleRole';
-import { useEditModuleAccess } from '../api-hooks/user-modules-hooks/useEditModuleAccess';
-import { useRemoveUserModule } from '../api-hooks/user-modules-hooks/useRemoveUserModule';
-import { useSaveModuleRole } from '../api-hooks/user-modules-hooks/useSaveModuleRole';
-import type { GridDataItem } from '../types/user-modules/userModules.types';
 
+// --- API Response Interfaces ---
+interface GridDataItem {
+    AppUserId: number;
+    AppRoleId: number;
+    IsPrimary: boolean;
+    RoleName: string | null;
+    ModuleName: string;
+    Id: number;
+    ModuleId: number;
+    HasAccess: boolean;
+}
+
+interface ApiResponse {
+    Message: string | null;
+    Data: {
+        UserId: number;
+        GridData: GridDataItem[];
+        AppUserName: string;
+        LoginId: string;
+        AppUserRole: string;
+    };
+}
+
+interface RoleOption {
+    Id: number;
+    Description: string;
+}
+
+interface EditRoleApiResponse {
+    Message: string | null;
+    Data: {
+        Message: string;
+        UserModule: {
+            AppUserId: number;
+            AppRoleId: number;
+            Id: number;
+            ModuleId: number;
+            HasAccess: boolean;
+        };
+        ModuleName: string;
+        Roles: RoleOption[];
+    };
+}
+
+interface EditAccessApiResponse {
+    Message: string | null;
+    Data: {
+        RemoveUserModule: {
+            AppUserId: number;
+            ModuleId: number;
+            AccessType: number;
+        };
+        ModuleName: string;
+    };
+}
 
 type ModalType = 'role' | 'access' | null;
 
@@ -14,32 +63,60 @@ const ManageUserModules: React.FC = () => {
     const { id } = useParams();
     const currentUserId = id || '1';
 
-    // Custom Hooks
-    const {
-        modules,
-        userInfo,
-        isLoading,
-        error,
-        refetch,
-        // setModules
-    } = useGetModuleList(currentUserId);
+    // States
+    const [modules, setModules] = useState<GridDataItem[]>([]);
+    const [userInfo, setUserInfo] = useState({
+        name: 'Loading...',
+        loginId: 'Loading...',
+        role: 'Loading...'
+    });
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const { fetchRoles, availableRoles, setAvailableRoles, loading: rolesLoading } = useEditModuleRole();
-    const { fetchAccessDetails, loading: accessLoading } = useEditModuleAccess();
-    const { removeModuleAccess, loading: removeLoading } = useRemoveUserModule();
-    const { saveRole, loading: saveLoading } = useSaveModuleRole();
-
-    // Local States
     const [activeModal, setActiveModal] = useState<ModalType>(null);
     const [selectedModule, setSelectedModule] = useState<GridDataItem | null>(null);
+
+    // মোডাল রোল স্টেট
+    const [availableRoles, setAvailableRoles] = useState<RoleOption[]>([]);
     const [isModalLoading, setIsModalLoading] = useState<boolean>(false);
+    const [isSaving, setIsSaving] = useState<boolean>(false); // সেভিং লোডার স্টেট
     const [selectedRoleId, setSelectedRoleId] = useState<number | string>('');
+
+    // মোডাল অ্যাক্সেস স্টেট
     const [hasAccessStatus, setHasAccessStatus] = useState<boolean>(false);
 
-    const isSaving = saveLoading || removeLoading;
-    const isModalActionLoading = rolesLoading || accessLoading || isModalLoading;
+    // Initial Data Fetching Function (এটিকে আলাদা করা হয়েছে যাতে সেভ করার পর আবার কল করা যায়)
+    const fetchModules = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch(`/api/SecurityAdmin/GetModuleList?userId=${currentUserId}`);
 
-    // Open Role Modal
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const resData: ApiResponse = await response.json();
+
+            if (resData.Data) {
+                setModules(resData.Data.GridData);
+                setUserInfo({
+                    name: resData.Data.AppUserName,
+                    loginId: resData.Data.LoginId,
+                    role: resData.Data.AppUserRole
+                });
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Something went wrong');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchModules();
+    }, [id]);
+
+    // Grant Access / Edit Role ক্লিক ফাংশন
     const openRoleModal = async (mod: GridDataItem) => {
         setSelectedModule(mod);
         setActiveModal('role');
@@ -48,9 +125,14 @@ const ManageUserModules: React.FC = () => {
         setSelectedRoleId(mod.AppRoleId || '');
 
         try {
-            const roles = await fetchRoles(mod.ModuleId);
-            if (roles && roles.length > 0) {
-                setAvailableRoles(roles);
+            const response = await fetch(`/api/SecurityAdmin/EditModuleRole?moduleId=${mod.ModuleId}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch roles for this module');
+            }
+            const resData: EditRoleApiResponse = await response.json();
+
+            if (resData.Data && resData.Data.Roles) {
+                setAvailableRoles(resData.Data.Roles);
             }
         } catch (err) {
             console.error("Error fetching roles:", err);
@@ -60,7 +142,7 @@ const ManageUserModules: React.FC = () => {
         }
     };
 
-    // Open Access Modal
+    // Edit Access ক্লিক ফাংশন
     const openAccessModal = async (mod: GridDataItem) => {
         setSelectedModule(mod);
         setActiveModal('access');
@@ -68,8 +150,19 @@ const ManageUserModules: React.FC = () => {
         setHasAccessStatus(mod.HasAccess);
 
         try {
-            await fetchAccessDetails(Number(currentUserId), mod.ModuleId, mod.HasAccess);
-            setHasAccessStatus(mod.HasAccess);
+            const response = await fetch(
+                `/api/SecurityAdmin/EditModuleAccess?userId=${currentUserId}&moduleId=${mod.ModuleId}&hasAccess=${mod.HasAccess}`
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch access details');
+            }
+
+            const resData: EditAccessApiResponse = await response.json();
+
+            if (resData.Data) {
+                setHasAccessStatus(mod.HasAccess);
+            }
         } catch (err) {
             console.error("Error fetching access info:", err);
             alert("Could not load access details. Please try again.");
@@ -78,43 +171,71 @@ const ManageUserModules: React.FC = () => {
         }
     };
 
-    // Save Changes Handler
+    // Save Changes বাটনে ক্লিক করলে এই ফাংশনটি এক্সিকিউট হবে
+
     const handleSaveChanges = async () => {
         if (!selectedModule) return;
 
+        setIsSaving(true);
         try {
             if (activeModal === 'access') {
+                // যদি ইউজার 'Remove access' সিলেক্ট করে থাকে
                 if (hasAccessStatus === false) {
-                    await removeModuleAccess({
-                        AppUserId: Number(currentUserId),
-                        ModuleId: selectedModule.ModuleId,
-                        AccessType: 2
+                    const response = await fetch('/api/SecurityAdmin/RemoveUserModule', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        // এখানে AccessType: 2 পাস করা হলো যা ব্যাকএন্ডের RemoveAccessPermanently নির্দেশ করে
+                        body: JSON.stringify({
+                            AppUserId: Number(currentUserId),
+                            ModuleId: selectedModule.ModuleId,
+                            AccessType: 2
+                        }),
                     });
+
+                    if (!response.ok) throw new Error('Failed to remove module access');
                     alert('Access removed successfully!');
                 } else {
+                    // যদি 'Can access?' সিলেক্টেড থাকে এবং ইউজার কোনো পরিবর্তন না করে সেভ দেয়
                     closeModal();
                     return;
                 }
-            } else if (activeModal === 'role') {
+            }
+
+            else if (activeModal === 'role') {
                 if (!selectedRoleId) {
                     alert('Please select a role before saving.');
+                    setIsSaving(false);
                     return;
                 }
 
-                await saveRole({
-                    AppUserId: Number(currentUserId),
-                    ModuleId: selectedModule.ModuleId,
-                    AppRoleId: Number(selectedRoleId),
-                    HasAccess: true
+                // নতুন রোল অ্যাসাইন বা গ্র্যান্ট অ্যাক্সেস করার জন্য
+                const response = await fetch('/api/SecurityAdmin/SaveModuleRole', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        AppUserId: Number(currentUserId),
+                        ModuleId: selectedModule.ModuleId,
+                        AppRoleId: Number(selectedRoleId),
+                        HasAccess: true
+                    }),
                 });
+
+                if (!response.ok) throw new Error('Failed to save module role');
                 alert('Role updated and access granted successfully!');
             }
 
+            // সফল হলে মোডাল বন্ধ করে টেবিল রিফ্রেশ করা হবে
             closeModal();
-            await refetch();
+            fetchModules();
         } catch (err) {
             console.error("Error saving data:", err);
             alert(err instanceof Error ? err.message : 'Something went wrong while saving.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -123,7 +244,6 @@ const ManageUserModules: React.FC = () => {
         setSelectedModule(null);
         setAvailableRoles([]);
         setSelectedRoleId('');
-        setHasAccessStatus(false);
     };
 
     if (isLoading) {
@@ -149,7 +269,7 @@ const ManageUserModules: React.FC = () => {
         <div className="min-h-screen bg-[#f3f4f6] p-4 md:p-10 font-sans">
             <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
 
-                {/* Header Section */}
+                {/* --- Header Section --- */}
                 <div className="p-6 border-b border-gray-100">
                     <h2 className="text-2xl text-gray-800 mb-6">Manage User Modules for:</h2>
                     <div className="flex flex-wrap gap-x-16 gap-y-4 text-[15px] text-gray-700">
@@ -159,7 +279,7 @@ const ManageUserModules: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Table Section */}
+                {/* --- Table Section --- */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -214,10 +334,10 @@ const ManageUserModules: React.FC = () => {
                 </div>
             </div>
 
-            {/* MODALS */}
+            {/* --- MODALS --- */}
             {activeModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/70" onClick={closeModal} />
+                    <div className="absolute inset-0 bg-slate-900/70 " onClick={closeModal} />
 
                     <div className="relative bg-white w-full max-w-md rounded-lg shadow-2xl">
                         <div className="p-6">
@@ -231,7 +351,8 @@ const ManageUserModules: React.FC = () => {
                                         <p className="text-sm text-gray-600">Module: <span className="font-semibold text-gray-900">{selectedModule?.ModuleName}</span></p>
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">Role</label>
-                                            {isModalActionLoading ? (
+
+                                            {isModalLoading ? (
                                                 <p className="text-sm text-blue-600 animate-pulse">Loading roles...</p>
                                             ) : (
                                                 <select
@@ -254,7 +375,8 @@ const ManageUserModules: React.FC = () => {
                                 {activeModal === 'access' && (
                                     <div className="space-y-4">
                                         <p className="text-sm text-gray-600 mb-2">Module: <span className="font-semibold text-gray-900">{selectedModule?.ModuleName}</span></p>
-                                        {isModalActionLoading ? (
+
+                                        {isModalLoading ? (
                                             <p className="text-sm text-blue-600 animate-pulse">Loading status...</p>
                                         ) : (
                                             <>
@@ -297,7 +419,7 @@ const ManageUserModules: React.FC = () => {
                                 <button
                                     onClick={handleSaveChanges}
                                     className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition shadow-sm disabled:opacity-50 flex items-center gap-1"
-                                    disabled={isModalActionLoading || isSaving}
+                                    disabled={isModalLoading || isSaving}
                                 >
                                     {isSaving ? 'Saving...' : 'Save Changes'}
                                 </button>
@@ -311,3 +433,4 @@ const ManageUserModules: React.FC = () => {
 };
 
 export default ManageUserModules;
+
