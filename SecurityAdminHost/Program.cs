@@ -1,23 +1,19 @@
-using System.Net.Http;
+using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Linq;
-using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ১. সার্ভিস ও CORS কনফিগারেশন রেজিস্ট্রেশন
+// Service and CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:54080") // আপনার Vite ফ্রন্টএন্ড পোর্ট
-              .WithOrigins("http://localhost:5205")
+        policy.WithOrigins("http://localhost:54080", "http://localhost:5205")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // সেশন কুকি পাস করার জন্য আবশ্যক
+              .AllowCredentials();
     });
 });
 
@@ -27,85 +23,69 @@ builder.Services.AddSpaStaticFiles(options =>
     options.RootPath = "../securityadmin/dist";
 });
 
-// HttpClient কনফিগারেশন (যেন এটি নিজস্ব কুকি কন্টেইনার দিয়ে আমাদের কাস্টম কুকি ব্লক না করে)
+// HttpClient configuration without automatic cookies
 builder.Services.AddHttpClient("AzureProxy")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
-        UseCookies = false, // কাস্টম কুকি পাস করার জন্য এটি অত্যন্ত জরুরি
+        UseCookies = false,
         AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
     });
 
 var app = builder.Build();
 
 app.UseStaticFiles();
-app.UseCors(); // UseRouting এর ঠিক উপরে থাকবে
+app.UseCors();
 app.UseRouting();
 
-// ২. রিভার্স প্রক্সি মিডলওয়্যার
+// Reverse proxy middleware
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.Value != null &&
-        context.Request.Path.Value.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
+    if (context.Request.Path.Value?.StartsWith("/api", StringComparison.OrdinalIgnoreCase) == true)
     {
         var httpClientFactory = context.RequestServices.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient("AzureProxy");
 
-        // লাইভ Azure ইউআরএল তৈরি
         var targetUrl = $"https://pechangatesthemaiya.azurewebsites.net{context.Request.Path}{context.Request.QueryString}";
         var requestMessage = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
 
-        // POST/PUT/PATCH রিকোয়েস্টের বডি বা ডাটা কপি করা
+        // Copy request body for non-GET requests
         if (context.Request.Method != "GET" && context.Request.Method != "HEAD")
         {
-            var streamContent = new StreamContent(context.Request.Body);
-            requestMessage.Content = streamContent;
+            requestMessage.Content = new StreamContent(context.Request.Body);
         }
 
-        // ব্রাউজার থেকে আসা হেডারগুলো প্রক্সিতে কপি করা
+        // Copy headers except Host and Cookie
         foreach (var header in context.Request.Headers)
         {
             if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) ||
                 header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
-            {
                 continue;
-            }
 
-            if (header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
-            {
-                if (requestMessage.Content != null)
-                {
-                    requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                }
-            }
+            if (header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase) && requestMessage.Content != null)
+                requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
             else
-            {
                 requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-            }
         }
 
-        // Azure সার্ভার ট্রাস্টের জন্য হোস্ট হেডার ফিক্স
         requestMessage.Headers.Host = "pechangatesthemaiya.azurewebsites.net";
 
-        // [NEW FRESH COOKIE]: আপনার সদ্য আপডেট হওয়া তাজা কুকি স্ট্রিং
-        string freshLiveCookie = "ARRAffinity=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; ARRAffinitySameSite=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; .AspNetCore.Antiforgery.cdV5uW_Ejgc=CfDJ8LbtibfgVHBJjONX366BUVlX-OXfn4E6tBEPQnYotTOUZsj1y7fM8_PCp0xRQfJ5GIdRIsvSltlyLB57qhGnbeXJzFc_zE8t5aC5g-SJIchI9YSf88ujjqF2Ss43-FhcJVtRjKCxvDM0jpkbgnA_GMw; .AspNetCore.Cookies=CfDJ8LbtibfgVHBJjONX366BUVl4CPUq6-Xn-4dJVgztLE9lG670PpOAV9PavZMaXPFb0tOn68D_xArBXAeQQIbH9tYfOAu95xttmVxVb5kM0GipeD8ZwwZF_u_nK23Sc8EhDrTvRSQ5b1paZCrn6r3GwVuPaNzyKqxLZqGT7bQjeKyftMrTCFopsdfRtYrw3GudxKuO8pu8GRCuiI2Y1Hv_3KHgTJngUaA_u5T7-_zmaqOEXOTPjQ0tm_K97woIc0No3YyiWGFEy6jJRCDgOA5-DjRD4BrnDGPnIgZ-o5IQxq4jqg4RvD6Y-YrUWNOHuBT5LHlHmxYBOt_zqTujPMVohPsxCQLomWnX7bRDrR6yfcLfi6fI6HuJpwhUarHyRyYyVd1GtjZD33jS1KpXA0qX3a-d09s81WWZcuyV3-onnICgqWYO4GDyO4TuMLjONn9HnrOW0mfQPrAg90f1ICIJaNSn7PEtl8MTSr46fZ0xBeSHsp5gUlAlGE9-gpSd9K5SOKT3UKvZjbEqPDwk1Pyg5Df-Tl4LZKTEo6ImbjZfQmxiEgu87boGwYDY3r5Tsa6QhHXrjQrDVOkPGBSHxzMxcXgiZ7HjVDLO-EdeJLj8SYvnqIOW_WuDK3aZXYFIuBgW331NSCo_3BlkXeoLi2GMbeDQIkNkaEuCxaKmz3eWxfpUoqtIcs2ZFPsMARwgJwMlyHyj6VXoekzTdxOEaZi2DEKHLsBURd9p0ojxzYwWvmAVYTP-hGrjLqY994MyaCiM1A9PTHN9PBkjwzYpuvy9XjV3Pdz1me-HYv8-BInOejugQLv9ZvhqARrf0YkbF5XBRPbZU2Y4KDX3hXnWhCRX-jxZHASiFSM5XkfXrE1xLIAUNuhuTmWd4DxbddQjfBokInF7_N7bumsKhciLJWtglM9zuLMslnOXCBXz6DU_c6OxEpZOe1PwSfmYcZJX8MUA9QMf_vLpE8Tf7G5NRSfijX9XTzMsY7rem3gTBX1zoGhotURnsJGo5toMW-3uUV8NYzuVEXojKDLOZU1UHBRYXETqykDCOmuQOKzMjFDlHCNb6Gh3sfWHr3Aqi8bh1iEgba9VHp0--xJk3TCyaXfGMZ-cs5Q_j4V4W61sFwfoLxxOmrN9ZJAiGrP6fn3g6S-5sH0ZUSLAaIOyeQyT0FaNWnba4uZu1h_t9STisTtX-intHkF1QTis0TGjA_lpWXLwak1FLnQc-qFZUxkYof0vKW1Zji1c3IV6SmkKiKJymnMmjShh88z7uI2twGLhy3ynXxn7-wQQIkeGYDMgJG66j5EQ_iuQ3dt1uJyolpeUhOKG9XkTMaeNIo0qq0O5KmtNPhxWyJ13wgq3wSPg_DGJyZReqEaq0cvzj5S98Gphv1oL8_qL2cXKy0Oi5XB7jT3_U3BQgdoJItUco63rH0FW4jIKIDAc3Sxjj9mobIt5kzmZYcKs3_4zc5qLg0mjoD1tsJP6LtsYn_0PCGpnT7bOrsi1aUPWbbcUE_4SlJNlyS2otNN65R1E89HkccAwxItg2CP4sNvwlZdXY22UaK86a22_ee4CPp4E2hf0F5KO3fiFl-HkaLy41MBEl8jfMfxOh7QJ2wasNOgS38MfPRCYB6OeLI-ZzsL6fj6PTb8xvD5Tf_BInNz1x8GloBaEU0bZtZyHgfcDIF1rMo2HzC1L0Mv4gm5cRIOp2iDpYs7vBXT3S5ohbmy6ku5aLwVNyj5Q6xRy9qvol5hWWexL-8FSzGfpyIlpmZgo_1d9SqnmET3PCGiXQSbQa1aIH5Lw9vGnXzhg_ZTSmpB-gCKkI6axn2HCgUnbKsZc3LsYSN6RqzYCd9U7LJTDOtOlJgtK9lHi3qL1SAdA-SIRs-OgRsZlVNLvC9Pt66LCUenippgXVlbOCK-LK8RJugek2_RnE7_RnPAUaF34N46XGut8PmPe9H1T6PK8agCKzf4QnVF6T_4GpiAcEwCyAKrNgvPwgOaBsDojdDBayUYph9gMAcIeROAQhqZErBp2TqlQ_ZJGvjgbacwpYc0nRTH2dS9Jnom21skl2qwBuYCPlRvrevVMnFDiyUd3ay5J8kXmSUvUYlgr6lc_qlMS0LwVMeJRFw0O33nsjnHITz1pBQLfaC7bImMmoBfydOgFwEIH8d6ZWfJVk2lKvu9cpUN-Kq-UNUJfAQxQxlojzyuf2Z6_-GiPMuoTaYOaqnZuElOvGkM-kioxHbtubu8RQj-mOhtpLQIAowbaZsVQFPs6S6tTBcqbXIePL7IysUFnEKYWr9e7fCpvoQ8GPJd9uimPLmy9ORwKKtv6b6davJEyF1zgsMeeY8SvKjiULBw2Fmpat-0PR8OVbjICxWJPXghljNXDaZ3rD1JscZo1H6QakqP_FYelb8A; .AspNetCore.Session=CfDJ8LbtibfgVHBJjONX366BUVnWQraCNyCl6wE%2FUJfy6Zp%2BYnaNgypeNaP0vz%2B%2FARs1nOd5KcOFNPrOBq2MPbfU8cK%2FliF6LFAhSPDoIRx%2BFX8UvfP2CwTciOrec4hNY7Ymu6kghCBiEGSLANexyVfY0u5uKYDW%2BKVNdPi2f5bcfO6q";
+        // Custom cookie injection
+        string freshLiveCookie = "ARRAffinity=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; ARRAffinitySameSite=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; .AspNetCore.Antiforgery.cdV5uW_Ejgc=CfDJ8LbtibfgVHBJjONX366BUVm2i-YMzrfsKboLXidJMQrRDXV_V34CBzKqKyQhwvUKNTfeldDbTyCzl8lopVr9jjOMUsVGUrXAssEhOILivaKarw7JRprlLBnP5FJCB7z5VoNjdU7G5K_N_E71pT4uIIY; .AspNetCore.Cookies=CfDJ8LbtibfgVHBJjONX366BUVkDulR4uWicsVIOgKkvE4p6cJ-jRPH4eGjB1TDLgVRcrj3s9UYp3MtU3vlyvUdlZu2sqeUqi5fCMh32YSx0lh2hDzZrK2fLlXGwvSOw-gtw5zI5iPNg5qynBJh98yDJ1fcB30WtTKXnd228ysN1SCSXUhCk7U10YwsBWgOuKuDz0YGyjzKyat5GElYklRDBySXk0Xdm70g3fU2_39TNrFz3CvdEWFe8ocAAfyDVQkXTUKH_tokao4-SV5rt_f7wbJtBjaszMDCmCz7uh_h1ECVEd5HpXeFiFwn49msaDxFiKpzgmLP6-uh4SF7cShDgI3a_-UU2R5P_vhCOgkgz9dvZVAj-wm1f9t52Hyp3X36QHhVsz48Y16O0sxjM43mZa7jDqT-sDWfMdEzJt5BmDGEVPI_N-7cnRj-Ad12XKMwNQ2QNTtI1PvZt8hirXhyDSpIW6XGHypqxjcd0qGSbM3yUt1zW3olYuU8BcJ3bSMjoxa78b30l5KyNdtX-GMThXAdJYPH5z6XyVcAMXYc5v19a8D6yteEO2lPBS5Pk6VeTv9RyQZeKhbBKDeUAwuowIRM3wWeqYeBoKcAdUwhSqNAgghdHk-AEABzN5VpvuS4At1lbQIO26iSVvtX6n7bs2RMUkMDGpqlqBQI3GcLzdNizuPxtJml_DMY1QT1uDWbmrtQJQp_LfzzHR4efomPRaABlGYBNP8JW_JIyclSILdrQBI2pr3MFjlXfxCEihfmghS1OWbR2Sf7qfW4GRKXPcYNrVABqqASZAWqajaCPxCXlRMhHs47qnfAniqqhsOHNzDlyG4867ZqtmJ2rw1q34Iwj1RswoTrNxp-DdYNnZ5UVjuaJTwk3lFfy82OIOHLNq2SKPPvi3qDw3mWYBj22Rl0Ku2N56ji7eNn9d5SkEXHQcZQucuHLR2FyZ1AIu0YzpnxjoZxVWUn6vJoZQgDsmhTMf4rETGFqs_WTFSSlrF0luvq5u9cnsezuDs4FJnWy_NMOzSSAqg_skPrHynrcHA508CKrRzAn8ce1pHUn1qBT7diAN_zK4yXXp55pQWHCcBNNETKy1bhZewh0aLiX0gtAMrltPavjHdyB_M4I47sPePquMLjt5WNFSbwexSuJRBFcamV5Ddy2sm7KZ-VNKTUgxUtdhPGtjeXOAkkldk_WOIEUM_XAb727Jtk1yNA-pMYCimNdAyXSZJkrVIK-13go2Eo_ECrwn-CVMm_sO7ni1U0URhUC8pQIAF4fl-anLbsaDyQdrXNfd17IJHpaSUDfmOG5Hjebf0EyLEXQn8CAXXa1phqrMTt-WROFBDFEyNlEP-nq-rJem553AkMws48Ss83ILIN0QGzOA-qfgGQD9gLWUYzSP74UsyxCszvFi1aH3M3MoeVMYdpyr3ltJyQgJTRvbRv7gR1W_kV7WptkczKzTu63ESSTS9_6-LU-wnnUuosjqKjBEmncVWDtiezvFgZkowfxw6tljIfPNiicmsQy8JagS3rERJsIBuhuXN31YOlrQJiNNaRQ_soMTN7FUgG9JRQWHJ3Y7cMXx4TWa5Han5kTyw5JZpEscfzkdOTWYy-yQsmGcdcvoxWvfH4o-MraB8bcwScJ40pU4Lu_3uHu9xX6DfKMN2YFL_yz7JaXxCX0utfjUtDQzRMyIsvnDqgOe_AlTWsNUQCTan8V-Q08CAxrHT2UfGaEhR54E2OERWZOR-XBsUbogEws6gX0_X7veXcQpMyMX7wWZO36TldAcKqrwaHw0gNi-lG0b7p6M1HIie20asxr_Ok1YZLlQArYfAvTEJF0Ash9MLP_Xpurvr6_-6c0W1_dpAwTNr0k487lWO-FGTwwvSHfkZjSJ4FniXX2-40xGfkVF-GYixwH0316JyAwTahYI1u_2Yvo6MXWatv_9LAfk1ivtZwt0u9kwxROmp0GhC-3sKlnOIHCrNpVf1jExh0PuTWDVDpl3aSeSzu6nihK-6W7Km58-tbs_dJ1g9E1eDbVDXsAP5lqlkVlv5p2njTrED2AnoqMIhkdC-CScRawPiNSKmFIdEkEBvHQUem_w6SvSnzWdRdtZNckm5LRkOLxPgOz2uuSAxmxXYaX0sMHoEy__HwuFBkRzWFExtd-vU1gb7MHRIcNk371HDGNVYPzhvYSOy2xCQY4mBAzmONm8hrGNz-a1rthOnVMGcCK4D4TqewpvnOGWlfKU1fYFIgggRMmN__UU_mv9RUyu7J3NvPnu5lVLBV5CU4bmP_v41hRXaU7PDQbkEb8NMyZ1J-rDZ3yU36YmWcZp0afwf4RfxVyYaxSL37VkNnbhAwarPtP9NdFwgkl7CnPunkIh4mNUJhQXnh176nkiEOLMkIvJNXvxRc; .AspNetCore.Session=CfDJ8LbtibfgVHBJjONX366BUVkbQ%2B3fnya5HDVfjFZqRCO%2BvKqP1M6gjHuQcoq4WQFz07NtFkDR%2BeWUgyHCT9EyrwRdPf8XXVKvwP%2FDoRWTt8IGOi4xDdzgbHGovH0GS%2B8%2B6cQ7hS7G%2BX%2FRCZowkj5ubtuK3Ff0TQpW%2FBShDdCdgtbv";
 
         requestMessage.Headers.TryAddWithoutValidation("Cookie", freshLiveCookie);
 
-        // Azure লাইভ সার্ভারে রিকোয়েস্ট পাঠানো
         var responseMessage = await httpClient.SendAsync(requestMessage);
 
-        // রেসপন্স স্ট্যাটাস কোড সেট করা
         context.Response.StatusCode = (int)responseMessage.StatusCode;
 
-        // রেসপন্স হেডারগুলো ব্রাউজারে ব্যাক করার জন্য কপি করা
+        // Copy response headers
         foreach (var header in responseMessage.Headers)
         {
-            if (header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) ||
-                header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase))
+            if (!header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) &&
+                !header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                context.Response.Headers[header.Key] = header.Value.ToArray();
             }
-            context.Response.Headers[header.Key] = header.Value.ToArray();
         }
 
         foreach (var header in responseMessage.Content.Headers)
@@ -113,17 +93,12 @@ app.Use(async (context, next) =>
             context.Response.Headers[header.Key] = header.Value.ToArray();
         }
 
-        // চূড়ান্ত ডাটা ব্রাউজারে পুশ করা
         await responseMessage.Content.CopyToAsync(context.Response.Body);
         return;
     }
 
     await next();
 });
-
-
-
-
 
 app.MapRazorPages();
 
@@ -132,7 +107,6 @@ if (app.Environment.IsDevelopment())
     app.UseSpa(spa =>
     {
         spa.Options.SourcePath = "../securityadmin";
-
         spa.UseProxyToSpaDevelopmentServer("http://localhost:54080");
     });
 }

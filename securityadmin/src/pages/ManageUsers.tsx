@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus, Search, Grid, ShieldAlert, Layers, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { userService } from '../api/userService';
-import type { AppUser } from '../types/user';
+import type { AppUser } from '../api/manage-users/userTypes';
 
 const ManageUsers = () => {
     const navigate = useNavigate();
@@ -34,18 +34,14 @@ const ManageUsers = () => {
         fetchUsers();
     }, []);
 
-    /* 
-      👉 আপনার সেই সমস্যামূলক useEffect-টি এখান থেকে ফেলে দেওয়া হয়েছে।
-      স্টেট ডিরেক্ট চেঞ্জ না করে আমরা ট্যাব বা সার্চ চেঞ্জ হলে UI-তে প্রথম পেজ দেখাবো।
-    */
 
-    // ১. Active/Inactive ট্যাব ফিল্টার
+
     const filteredByTab = users.filter((user) => {
         const status = user?.IsActive !== undefined ? user.IsActive : user?.isActive;
         return activeTab === 'active' ? status === true : status === false;
     });
 
-    // ২. সার্চ ফিল্টার
+    // Search filter
     const searchedUsers = filteredByTab.filter((user) => {
         const searchString = searchTerm.toLowerCase();
         const loginId = String(user?.LoginId || user?.loginId || '').toLowerCase();
@@ -58,7 +54,6 @@ const ManageUsers = () => {
     // Pagination Logic
     const totalPages = Math.ceil(searchedUsers.length / itemsPerPage);
 
-    // সেফটি চেক: যদি সার্চের কারণে কারেন্ট পেজ টোটাল পেজের চেয়ে বড় হয়ে যায়, তবে ১ম পেজে ব্যাক করবে
     const safeCurrentPage = currentPage > totalPages ? 1 : currentPage;
 
     const indexOfLastItem = safeCurrentPage * itemsPerPage;
@@ -95,15 +90,15 @@ const ManageUsers = () => {
         startPage = Math.max(1, endPage - 9);
     }
 
-    // ট্যাব বা সার্চ পরিবর্তন করার সময় পেজ ১ করার জন্য হ্যান্ডলার
+    
     const handleTabChange = (tab: 'active' | 'inactive') => {
         setActiveTab(tab);
-        setCurrentPage(1); // ইউজার অ্যাকশনের সাথে স্টেট পরিবর্তন একদম সেফ
+        setCurrentPage(1); 
     };
 
     const handleSearchChange = (value: string) => {
         setSearchTerm(value);
-        setCurrentPage(1); // ইউজার টাইপ করার সাথে সাথে পেজ ১ হবে
+        setCurrentPage(1); 
     };
 
     return (
@@ -122,7 +117,7 @@ const ManageUsers = () => {
             {/* Tab Controller Buttons */}
             <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-px">
                 <button
-                    onClick={() => handleTabChange('active')} // পরিবর্তিত হ্যান্ডলার
+                    onClick={() => handleTabChange('active')}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium cursor-pointer transition-all border-b-2 ${activeTab === 'active'
                         ? 'border-emerald-500 text-emerald-600 font-semibold'
                         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -131,7 +126,7 @@ const ManageUsers = () => {
                     <CheckCircle size={16} /> Active Users ({users.filter(u => (u?.IsActive ?? u?.isActive) === true).length})
                 </button>
                 <button
-                    onClick={() => handleTabChange('inactive')} // পরিবর্তিত হ্যান্ডলার
+                    onClick={() => handleTabChange('inactive')} 
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium cursor-pointer transition-all border-b-2 ${activeTab === 'inactive'
                         ? 'border-rose-500 text-rose-600 font-semibold'
                         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -150,7 +145,7 @@ const ManageUsers = () => {
                         type="text"
                         placeholder="Search by ID, Name or Email..."
                         value={searchTerm}
-                        onChange={(e) => handleSearchChange(e.target.value)} // পরিবর্তিত হ্যান্ডলার
+                        onChange={(e) => handleSearchChange(e.target.value)} 
                         className="bg-transparent outline-none text-slate-600 dark:text-slate-300 w-full text-sm"
                     />
                 </div>

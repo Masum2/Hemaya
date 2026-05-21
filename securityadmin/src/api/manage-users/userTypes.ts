@@ -1,3 +1,4 @@
+// User/AppUser interface
 export interface AppUser {
     Id?: string | number;
     id?: string | number;
@@ -19,14 +20,18 @@ export interface AppUser {
     isActive?: boolean;
 }
 
-// এপিআই রেসপন্সের বিভিন্ন সম্ভাব্য ফরম্যাটের জন্য একটি জেনেরিক টাইপ
+// API Response 
 export interface ApiResponse<T> {
     Data?: T;
     data?: T;
     appUserData?: T;
     result?: T;
+    message?: string;
+    errors?: Record<string, string[]>;
+    success?: boolean;
 }
 
+// System Role Type
 export interface SystemRole {
     id: number;
     name: string;
@@ -34,6 +39,7 @@ export interface SystemRole {
     label: string;
 }
 
+// Form Data State
 export interface FormDataState {
     firstName: string;
     lastName: string;
@@ -45,6 +51,7 @@ export interface FormDataState {
     isActive: boolean;
 }
 
+// Backend User Type 
 export interface BackendUser {
     Id?: number | string;
     id?: number | string;
@@ -64,13 +71,7 @@ export interface BackendUser {
     isActive?: boolean;
 }
 
-export interface ApiResponse<T> {
-    Data?: T;
-    data?: T;
-    message?: string;
-    errors?: Record<string, string[]>;
-}
-
+// API Payload for Add/Edit
 export interface ApiPayload {
     appUserData: {
         id: number;
@@ -84,4 +85,26 @@ export interface ApiPayload {
         isTempPassword: boolean;
     };
     appRoleId: number;
+}
+
+// Get User List Response Type
+export interface GetUserListResponse {
+    data?: BackendUser[];
+    Data?: BackendUser[];
+    users?: BackendUser[];
+}
+
+// Query Options Type
+export interface QueryOptions {
+    enabled?: boolean;
+    staleTime?: number;
+    cacheTime?: number;
+    retry?: number;
+}
+
+// Error Response Type
+export interface ErrorResponse {
+    message?: string;
+    errors?: Record<string, string[]>;
+    status?: number;
 }

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 
 import UserForm from './pages/UserForm';
-import Dashboard from './pages/Dashboard';
+
 import { ManageSystemPrivileges } from './pages/ManageSystemPrivileges';
 import ManageWidgets from './pages/ManageWidgets';
 import ManageUserModules from './pages/ManageUserModules';

@@ -1,11 +1,10 @@
 import axios from 'axios';
-import type {  AppUser } from '../types/user';
+import type { AppUser } from './manage-users/userTypes';
+
 
 
 export const userService = {
-    /**
-     * ব্যাকএন্ড থেকে ইউজার লিস্ট নিয়ে আসে এবং ক্লিন অ্যারে রিটার্ন করে
-     */
+  
     getUserList: async (): Promise<AppUser[]> => {
        
         const response = await axios.get('/api/SecurityAdmin/GetUserList', {
@@ -23,7 +22,7 @@ export const userService = {
 
         console.log("Clean API Response Data:", resData);
 
-        // বিভিন্ন স্ট্রাকচারের ডেটা হ্যান্ডেল করার লজিক (সেন্ট্রালাইজড)
+      
         if (resData && Array.isArray(resData.Data)) return resData.Data;
         if (Array.isArray(resData)) return resData;
         if (resData && Array.isArray(resData.data)) return resData.data;
