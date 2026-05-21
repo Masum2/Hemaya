@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="C:\Users\Masum Billah\source\repos\SecurityAdmin\securityadmin.esproj" />
+		<ProjectReference Include="..\SecurityAdmin\securityadmin.esproj" />
 	</ItemGroup>
 
 	<ItemGroup>
