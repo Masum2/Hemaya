@@ -104,6 +104,9 @@ const ManageWidgets = () => {
     const [assignedWidgets, setAssignedWidgets] = useState<WidgetItem[]>([]);
     const [readyWidgets, setReadyWidgets] = useState<WidgetItem[]>([]);
 
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'assigned' | 'ready'>('assigned');
+
     const [userInfo, setUserInfo] = useState({
         name: "Krishna Intake Worker",
         loginId: "veni_sw",
@@ -381,159 +384,201 @@ const ManageWidgets = () => {
                     </div>
                 </div>
 
-                {/* TABLE 1: Assigned Widgets */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
-                    <div className="bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                            <h3 className="font-bold text-slate-800 text-base">Assigned Widgets</h3>
-                        </div>
-                        <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
-                            Total: {assignedWidgets.length}
-                        </span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                                    <th className="py-3.5 px-6">Widget Name</th>
-                                    <th className="py-3.5 px-6">Group Category</th>
-                                    <th className="py-3.5 px-6">Type</th>
-                                    <th className="py-3.5 px-6 text-center">Personal</th>
-                                    <th className="py-3.5 px-6 text-center">Status</th>
-                                    <th className="py-3.5 px-6 text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {loading && assignedWidgets.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Loading widgets context...</td></tr>
-                                ) : assignedWidgets.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-medium">No assigned widgets found for this workspace.</td></tr>
-                                ) : (
-                                    assignedWidgets.map((widget) => {
-                                        const meta = getComponentMeta(widget.WidgetComponentId);
-                                        const typeInfo = WIDGET_TYPE_MAP[widget.WidgetType] || { name: "Essential", color: "#0ea5e9", bg: "rgba(14, 165, 233, 0.08)", border: "rgba(14, 165, 233, 0.15)" };
-
-                                        return (
-                                            <tr key={widget.Id} className="hover:bg-slate-50/60 transition-colors group">
-                                                <td className="py-4 px-6 font-semibold text-slate-700 max-w-xs sm:max-w-md truncate">{meta.name}</td>
-                                                <td className="py-4 px-6 text-slate-500 font-medium">{meta.group}</td>
-                                                <td className="py-4 px-6">
-                                                    <span
-                                                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border tracking-wide"
-                                                        style={{ color: typeInfo.color, backgroundColor: typeInfo.bg, borderColor: typeInfo.border }}
-                                                    >
-                                                        {typeInfo.name}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${widget.IsMyStuff ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-slate-100 text-slate-500'}`}>
-                                                        {widget.IsMyStuff ? "Yes" : "No"}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <button
-                                                        onClick={() => toggleStatus(widget)}
-                                                        className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-all duration-200 outline-none ${!widget.IsInactive ? "bg-emerald-500 ring-4 ring-emerald-50" : "bg-slate-200"}`}
-                                                    >
-                                                        <span className={`inline-block h-3.5 w-3.5  transform rounded-full bg-white transition-all duration-200 ${!widget.IsInactive ? "translate-x-4.5" : "translate-x-1"}`} />
-                                                    </button>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <button
-                                                        onClick={() => handleRemoveClick(widget)}
-                                                        className="inline-flex items-center gap-1.5 cursor-pointer bg-rose-50 text-rose-600 text-xs px-3 py-1.5 rounded-lg hover:bg-rose-100 font-semibold border border-rose-100 transition-all opacity-90 group-hover:opacity-100 shadow-sm"
-                                                    >
-                                                        <Trash2 size={13} /> Remove
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Bulk Assign Callout Section */}
-                <div className="flex items-center justify-between bg-white border border-slate-200/80 p-4 rounded-2xl shadow-sm">
-                    <p className="text-sm text-slate-500 font-medium pl-2">
-                        {readyWidgets.length > 0 ? `🔥 Extra ${readyWidgets.length} widgets are available for deployment.` : "🎉 Beautiful! All available widgets have been assigned."}
-                    </p>
+                {/* Tab Navigation for Widget Sections */}
+                <div className="flex gap-2 border-b border-slate-200">
                     <button
-                        onClick={assignAllWidgets}
-                        disabled={readyWidgets.length === 0 || actionLoading}
-                        className="bg-indigo-600 text-white text-sm px-5 py-2 cursor-pointer rounded-xl shadow-md shadow-indigo-100 hover:bg-indigo-700 active:scale-98 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed font-semibold transition-all"
+                        onClick={() => setActiveTab('assigned')}
+                        className={`px-6 py-3 text-sm font-semibold transition-all relative ${activeTab === 'assigned'
+                                ? 'text-indigo-600'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
                     >
-                        {actionLoading ? "Processing Workspace..." : "Assign All Widgets"}
+                        Assigned Widgets
+                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">
+                            {assignedWidgets.length}
+                        </span>
+                        {activeTab === 'assigned' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ready')}
+                        className={`px-6 py-3 text-sm font-semibold transition-all relative ${activeTab === 'ready'
+                                ? 'text-indigo-600'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                    >
+                        Ready to be Assigned
+                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">
+                            {readyWidgets.length}
+                        </span>
+                        {activeTab === 'ready' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                        )}
                     </button>
                 </div>
 
-                {/* TABLE 2: Ready to be Assigned */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-r from-sky-50 to-indigo-50/40 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                            <h3 className="font-bold text-slate-800 text-base">Ready to be Assigned</h3>
-                        </div>
-                        <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-indigo-100 text-indigo-600 rounded-full">
-                            Available: {readyWidgets.length}
-                        </span>
-                    </div>
+                {/* Assigned Widgets Tab Content */}
+                {activeTab === 'assigned' && (
+                    <>
+                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+                            <div className="bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                    <h3 className="font-bold text-slate-800 text-base">Assigned Widgets</h3>
+                                </div>
+                                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
+                                    Total: {assignedWidgets.length}
+                                </span>
+                            </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                                    <th className="py-3.5 px-6">Widget Name</th>
-                                    <th className="py-3.5 px-6">Group Category</th>
-                                    <th className="py-3.5 px-6" style={{ width: '180px' }}>Type Config</th>
-                                    <th className="py-3.5 px-6 text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {loading && readyWidgets.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-8 text-center text-slate-400 font-medium">Loading repository...</td></tr>
-                                ) : readyWidgets.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-8 text-center text-emerald-600 bg-emerald-50/10 font-medium">Awesome, repository is clean. All items deployed!</td></tr>
-                                ) : (
-                                    readyWidgets.map((item, index) => {
-                                        const meta = getComponentMeta(item.WidgetComponentId);
-                                        return (
-                                            <tr key={index} className="hover:bg-indigo-50/20 bg-white transition-colors group">
-                                                <td className="py-4 px-6 text-slate-700 font-semibold max-w-xs sm:max-w-md truncate">{meta.name}</td>
-                                                <td className="py-4 px-6 text-slate-500 font-medium">{meta.group}</td>
-                                                <td className="py-4 px-6">
-                                                    <select
-                                                        value={item.WidgetType}
-                                                        onChange={(e) => handleTypeChange(item.WidgetComponentId, Number(e.target.value))}
-                                                        className="w-full h-9 border border-slate-200 rounded-xl px-2.5 text-xs bg-slate-50 font-semibold text-slate-600 outline-none hover:border-slate-300 focus:border-indigo-500 focus:bg-white transition-all cursor-pointer"
-                                                        disabled={actionLoading}
-                                                    >
-                                                        {Object.entries(WIDGET_TYPE_MAP).map(([key, val]) => (
-                                                            <option key={key} value={key}>{val.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <button
-                                                        onClick={() => assignWidget(item)}
-                                                        disabled={actionLoading}
-                                                        className="inline-flex items-center cursor-pointer gap-1.5 bg-indigo-50 text-indigo-600 text-xs px-3.5 py-2 rounded-xl hover:bg-indigo-600 hover:text-white font-bold border border-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-400 shadow-sm"
-                                                    >
-                                                        <Plus size={13} /> Assign Widget
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                                            <th className="py-3.5 px-6">Widget Name</th>
+                                            <th className="py-3.5 px-6">Group Category</th>
+                                            <th className="py-3.5 px-6">Type</th>
+                                            <th className="py-3.5 px-6 text-center">Personal</th>
+                                            <th className="py-3.5 px-6 text-center">Status</th>
+                                            <th className="py-3.5 px-6 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loading && assignedWidgets.length === 0 ? (
+                                            <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Loading widgets context...</td></tr>
+                                        ) : assignedWidgets.length === 0 ? (
+                                            <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-medium">No assigned widgets found for this workspace.</td></tr>
+                                        ) : (
+                                            assignedWidgets.map((widget) => {
+                                                const meta = getComponentMeta(widget.WidgetComponentId);
+                                                const typeInfo = WIDGET_TYPE_MAP[widget.WidgetType] || { name: "Essential", color: "#0ea5e9", bg: "rgba(14, 165, 233, 0.08)", border: "rgba(14, 165, 233, 0.15)" };
+
+                                                return (
+                                                    <tr key={widget.Id} className="hover:bg-slate-50/60 transition-colors group">
+                                                        <td className="py-4 px-6 font-semibold text-slate-700 max-w-xs sm:max-w-md truncate">{meta.name}</td>
+                                                        <td className="py-4 px-6 text-slate-500 font-medium">{meta.group}</td>
+                                                        <td className="py-4 px-6">
+                                                            <span
+                                                                className="px-2.5 py-1 rounded-lg text-xs font-semibold border tracking-wide"
+                                                                style={{ color: typeInfo.color, backgroundColor: typeInfo.bg, borderColor: typeInfo.border }}
+                                                            >
+                                                                {typeInfo.name}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${widget.IsMyStuff ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-slate-100 text-slate-500'}`}>
+                                                                {widget.IsMyStuff ? "Yes" : "No"}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center">
+                                                            <button
+                                                                onClick={() => toggleStatus(widget)}
+                                                                className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-all duration-200 outline-none ${!widget.IsInactive ? "bg-emerald-500 ring-4 ring-emerald-50" : "bg-slate-200"}`}
+                                                            >
+                                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-all duration-200 ${!widget.IsInactive ? "translate-x-4.5" : "translate-x-1"}`} />
+                                                            </button>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center">
+                                                            <button
+                                                                onClick={() => handleRemoveClick(widget)}
+                                                                className="inline-flex items-center gap-1.5 cursor-pointer bg-rose-50 text-rose-600 text-xs px-3 py-1.5 rounded-lg hover:bg-rose-100 font-semibold border border-rose-100 transition-all opacity-90 group-hover:opacity-100 shadow-sm"
+                                                            >
+                                                                <Trash2 size={13} /> Remove
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Ready to be Assigned Tab Content */}
+                {activeTab === 'ready' && (
+                    <>
+                        {/* Bulk Assign Callout Section */}
+                        <div className="flex items-center justify-between bg-white border border-slate-200/80 p-4 rounded-2xl shadow-sm">
+                            <p className="text-sm text-slate-500 font-medium pl-2">
+                                {readyWidgets.length > 0 ? `🔥 Extra ${readyWidgets.length} widgets are available for deployment.` : "🎉 Beautiful! All available widgets have been assigned."}
+                            </p>
+                            <button
+                                onClick={assignAllWidgets}
+                                disabled={readyWidgets.length === 0 || actionLoading}
+                                className="bg-indigo-600 text-white text-sm px-5 py-2 cursor-pointer rounded-xl shadow-md shadow-indigo-100 hover:bg-indigo-700 active:scale-98 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed font-semibold transition-all"
+                            >
+                                {actionLoading ? "Processing Workspace..." : "Assign All Widgets"}
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                            <div className="bg-gradient-to-r from-sky-50 to-indigo-50/40 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                                    <h3 className="font-bold text-slate-800 text-base">Ready to be Assigned</h3>
+                                </div>
+                                <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-indigo-100 text-indigo-600 rounded-full">
+                                    Available: {readyWidgets.length}
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                                            <th className="py-3.5 px-6">Widget Name</th>
+                                            <th className="py-3.5 px-6">Group Category</th>
+                                            <th className="py-3.5 px-6" style={{ width: '180px' }}>Type Config</th>
+                                            <th className="py-3.5 px-6 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loading && readyWidgets.length === 0 ? (
+                                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 font-medium">Loading repository...</td></tr>
+                                        ) : readyWidgets.length === 0 ? (
+                                            <tr><td colSpan={4} className="p-8 text-center text-emerald-600 bg-emerald-50/10 font-medium">Awesome, repository is clean. All items deployed!</td></tr>
+                                        ) : (
+                                            readyWidgets.map((item, index) => {
+                                                const meta = getComponentMeta(item.WidgetComponentId);
+                                                return (
+                                                    <tr key={index} className="hover:bg-indigo-50/20 bg-white transition-colors group">
+                                                        <td className="py-4 px-6 text-slate-700 font-semibold max-w-xs sm:max-w-md truncate">{meta.name}</td>
+                                                        <td className="py-4 px-6 text-slate-500 font-medium">{meta.group}</td>
+                                                        <td className="py-4 px-6">
+                                                            <select
+                                                                value={item.WidgetType}
+                                                                onChange={(e) => handleTypeChange(item.WidgetComponentId, Number(e.target.value))}
+                                                                className="w-full h-9 border border-slate-200 rounded-xl px-2.5 text-xs bg-slate-50 font-semibold text-slate-600 outline-none hover:border-slate-300 focus:border-indigo-500 focus:bg-white transition-all cursor-pointer"
+                                                                disabled={actionLoading}
+                                                            >
+                                                                {Object.entries(WIDGET_TYPE_MAP).map(([key, val]) => (
+                                                                    <option key={key} value={key}>{val.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center">
+                                                            <button
+                                                                onClick={() => assignWidget(item)}
+                                                                disabled={actionLoading}
+                                                                className="inline-flex items-center cursor-pointer gap-1.5 bg-indigo-50 text-indigo-600 text-xs px-3.5 py-2 rounded-xl hover:bg-indigo-600 hover:text-white font-bold border border-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-400 shadow-sm"
+                                                            >
+                                                                <Plus size={13} /> Assign Widget
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* কাস্টম কনফার্মেশন মোডাল (Custom Confirmation Modal) */}
@@ -541,7 +586,7 @@ const ManageWidgets = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-x-hidden overflow-y-auto antialiased">
                     {/* Backdrop / ব্যাকড্রপ ব্লার ইফেক্ট */}
                     <div
-                        className="fixed inset-0 bg-slate-900/40  transition-opacity duration-300 animate-fade-in"
+                        className="fixed inset-0 bg-slate-900/40 transition-opacity duration-300 animate-fade-in"
                         onClick={() => !actionLoading && setIsModalOpen(false)}
                     />
 
@@ -568,7 +613,6 @@ const ManageWidgets = () => {
 
                             <p className="text-sm text-slate-500 leading-relaxed max-w-xs">
                                 Are you sure you want to remove <span className="font-semibold text-slate-700">"{getComponentMeta(widgetToDelete.WidgetComponentId).name}"</span>?
-                              
                             </p>
                         </div>
 

@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, Search, Edit3, Grid, ShieldAlert, Layers, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
-import axios from 'axios';
+import { UserPlus, Search, Grid, ShieldAlert, Layers, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
+import { userService } from '../api/userService';
+import type { AppUser } from '../types/user';
 
 const ManageUsers = () => {
     const navigate = useNavigate();
-    const [users, setUsers] = useState<any[]>([]);
+
+    const [users, setUsers] = useState<AppUser[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Active vs Inactive Tab State
     const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
-
-    // Search State
     const [searchTerm, setSearchTerm] = useState<string>('');
-
-    // Pagination States
     const [currentPage, setCurrentPage] = useState<number>(1);
     const itemsPerPage = 10;
 
@@ -24,33 +20,12 @@ const ManageUsers = () => {
             try {
                 setLoading(true);
                 setError(null);
-
-                const response = await axios.get('/api/SecurityAdmin/GetUserList', {
-                    withCredentials: true,
-                    headers: {
-                        'accept': '*/*'
-                    }
-                });
-
-                console.log("Clean API Response Data:", response.data);
-
-                if (response.data && Array.isArray(response.data.Data)) {
-                    setUsers(response.data.Data);
-                } else if (Array.isArray(response.data)) {
-                    setUsers(response.data);
-                } else if (response.data && Array.isArray(response.data.data)) {
-                    setUsers(response.data.data);
-                } else if (response.data && Array.isArray(response.data.appUserData)) {
-                    setUsers(response.data.appUserData);
-                } else if (response.data && Array.isArray(response.data.result)) {
-                    setUsers(response.data.result);
-                } else {
-                    console.warn("Expected an array but got a different structure.");
-                    setUsers([]);
-                }
-            } catch (err: any) {
+                const data = await userService.getUserList();
+                setUsers(data);
+            } catch (err) {
                 console.error("Error fetching user list:", err);
-                setError("Failed to load user list. Please check your session or network connection.");
+                const errorMessage = err instanceof Error ? err.message : "Failed to load user list.";
+                setError(`${errorMessage} Please check your session or network connection.`);
             } finally {
                 setLoading(false);
             }
@@ -59,43 +34,36 @@ const ManageUsers = () => {
         fetchUsers();
     }, []);
 
-    // Tab বা Search পরিবর্তন হলে পেজ নম্বর ১ এ রিসেট করার জন্য
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [activeTab, searchTerm]);
+    /* 
+      👉 আপনার সেই সমস্যামূলক useEffect-টি এখান থেকে ফেলে দেওয়া হয়েছে।
+      স্টেট ডিরেক্ট চেঞ্জ না করে আমরা ট্যাব বা সার্চ চেঞ্জ হলে UI-তে প্রথম পেজ দেখাবো।
+    */
 
-    // ১. Active/Inactive ট্যাবের ওপর ভিত্তি করে ফ্রন্টএন্ড ফিল্টার (PascalCase & camelCase সেফটিসহ)
+    // ১. Active/Inactive ট্যাব ফিল্টার
     const filteredByTab = users.filter((user) => {
-        // ব্যাকএন্ডের IsActive অথবা ফ্রন্টএন্ডের isActive দুটোই চেক করবে
         const status = user?.IsActive !== undefined ? user.IsActive : user?.isActive;
-
-        if (activeTab === 'active') {
-            return status === true;
-        } else {
-            return status === false;
-        }
+        return activeTab === 'active' ? status === true : status === false;
     });
 
-    // ২. ফিল্টার করা ডেটার ওপর সার্চ অ্যাপ্লাই করা (বড় ও ছোট হাতের ফিল্ড নেম সেফটিসহ)
+    // ২. সার্চ ফিল্টার
     const searchedUsers = filteredByTab.filter((user) => {
         const searchString = searchTerm.toLowerCase();
+        const loginId = String(user?.LoginId || user?.loginId || '').toLowerCase();
+        const fullName = String(user?.FullNameFormatted || user?.fullNameFormatted || '').toLowerCase();
+        const email = String(user?.Email || user?.email || '').toLowerCase();
 
-        const loginId = user?.LoginId ? String(user.LoginId).toLowerCase() : (user?.loginId ? String(user.loginId).toLowerCase() : '');
-        const fullName = user?.FullNameFormatted ? String(user.FullNameFormatted).toLowerCase() : (user?.fullNameFormatted ? String(user.fullNameFormatted).toLowerCase() : '');
-        const email = user?.Email ? String(user.Email).toLowerCase() : (user?.email ? String(user.email).toLowerCase() : '');
-
-        return (
-            loginId.includes(searchString) ||
-            fullName.includes(searchString) ||
-            email.includes(searchString)
-        );
+        return loginId.includes(searchString) || fullName.includes(searchString) || email.includes(searchString);
     });
 
     // Pagination Logic
-    const indexOfLastItem = currentPage * itemsPerPage;
+    const totalPages = Math.ceil(searchedUsers.length / itemsPerPage);
+
+    // সেফটি চেক: যদি সার্চের কারণে কারেন্ট পেজ টোটাল পেজের চেয়ে বড় হয়ে যায়, তবে ১ম পেজে ব্যাক করবে
+    const safeCurrentPage = currentPage > totalPages ? 1 : currentPage;
+
+    const indexOfLastItem = safeCurrentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentUsers = searchedUsers.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(searchedUsers.length / itemsPerPage);
 
     const handlePageChange = (pageNumber: number) => {
         if (pageNumber >= 1 && pageNumber <= totalPages) {
@@ -103,29 +71,39 @@ const ManageUsers = () => {
         }
     };
 
-    // নির্দিষ্ট ফরম্যাটে (e.g., Feb-13-2026) ডেট দেখানোর হেল্পার ফাংশন
-    const formatActiveDate = (dateString: any) => {
+    const formatActiveDate = (dateString: string | Date | null | undefined) => {
         if (!dateString) return 'N/A';
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'N/A';
 
-            // 'Feb-13-2026' ফরম্যাট তৈরি করার লজিক
-            const formatter = new Intl.DateTimeFormat('en-US', {
+            return new Intl.DateTimeFormat('en-US', {
                 month: 'short',
                 day: '2-digit',
                 year: 'numeric'
-            });
-
-            const parts = formatter.formatToParts(date);
-            const month = parts.find(p => p.type === 'month')?.value;
-            const day = parts.find(p => p.type === 'day')?.value;
-            const year = parts.find(p => p.type === 'year')?.value;
-
-            return `${month}-${day}-${year}`;
+            }).format(date).replace(/ /g, '-').replace(/,/g, '');
         } catch (e) {
             return 'N/A';
         }
+    };
+
+    // Pagination Range Calculation
+    let startPage = Math.max(1, safeCurrentPage - 4);
+    const  endPage = Math.min(totalPages, startPage + 9);
+
+    if (endPage - startPage < 9) {
+        startPage = Math.max(1, endPage - 9);
+    }
+
+    // ট্যাব বা সার্চ পরিবর্তন করার সময় পেজ ১ করার জন্য হ্যান্ডলার
+    const handleTabChange = (tab: 'active' | 'inactive') => {
+        setActiveTab(tab);
+        setCurrentPage(1); // ইউজার অ্যাকশনের সাথে স্টেট পরিবর্তন একদম সেফ
+    };
+
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        setCurrentPage(1); // ইউজার টাইপ করার সাথে সাথে পেজ ১ হবে
     };
 
     return (
@@ -144,7 +122,7 @@ const ManageUsers = () => {
             {/* Tab Controller Buttons */}
             <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-px">
                 <button
-                    onClick={() => setActiveTab('active')}
+                    onClick={() => handleTabChange('active')} // পরিবর্তিত হ্যান্ডলার
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium cursor-pointer transition-all border-b-2 ${activeTab === 'active'
                         ? 'border-emerald-500 text-emerald-600 font-semibold'
                         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -153,7 +131,7 @@ const ManageUsers = () => {
                     <CheckCircle size={16} /> Active Users ({users.filter(u => (u?.IsActive ?? u?.isActive) === true).length})
                 </button>
                 <button
-                    onClick={() => setActiveTab('inactive')}
+                    onClick={() => handleTabChange('inactive')} // পরিবর্তিত হ্যান্ডলার
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium cursor-pointer transition-all border-b-2 ${activeTab === 'inactive'
                         ? 'border-rose-500 text-rose-600 font-semibold'
                         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -172,7 +150,7 @@ const ManageUsers = () => {
                         type="text"
                         placeholder="Search by ID, Name or Email..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)} // পরিবর্তিত হ্যান্ডলার
                         className="bg-transparent outline-none text-slate-600 dark:text-slate-300 w-full text-sm"
                     />
                 </div>
@@ -189,13 +167,12 @@ const ManageUsers = () => {
                                 <th className="px-6 py-4">Email</th>
                                 <th className="px-6 py-4">Phone</th>
                                 <th className="px-6 py-4 text-center">Permissions</th>
-            
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={8} className="py-14 text-center">
+                                    <td colSpan={7} className="py-14 text-center">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div>
                                             <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Loading data, please wait...</span>
@@ -204,7 +181,7 @@ const ManageUsers = () => {
                                 </tr>
                             ) : error ? (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-10 text-red-500 font-medium text-sm">
+                                    <td colSpan={7} className="text-center py-10 text-red-500 font-medium text-sm">
                                         {error}
                                     </td>
                                 </tr>
@@ -215,39 +192,27 @@ const ManageUsers = () => {
 
                                     return (
                                         <tr key={userId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
-                                            {/* LoginId */}
-                                            <Link
-                                                to={`/users/edit/${userId}`}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
-                                            >
-                                               
-                                          
-                                            <td className="px-6 py-4 text-blue-600 font-bold text-sm whitespace-nowrap">
-                                                {user.LoginId || user.loginId}
+                                            <td className="px-6 py-4 text-sm whitespace-nowrap">
+                                                <Link
+                                                    to={`/users/edit/${userId}`}
+                                                    className="text-blue-600 font-bold hover:underline"
+                                                >
+                                                    {user.LoginId || user.loginId}
+                                                </Link>
                                             </td>
-                                            </Link>
-                                            {/* Display Name */}
                                             <td className="px-6 py-4 text-sm font-medium dark:text-white whitespace-nowrap">
                                                 {user?.FullNameFormatted || user?.fullNameFormatted}
                                             </td>
-
-                                            {/* Last Active Date formatted as Feb-13-2026 */}
                                             <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">
                                                 {formatActiveDate(user.LastActiveDate || user.lastActiveDate)}
                                             </td>
-
-                                            {/* Role */}
                                             <td className="px-6 py-4 text-sm dark:text-slate-300">
                                                 <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-semibold">
                                                     {roleName}
                                                 </span>
                                             </td>
-
-                                            {/* Email & Phone */}
                                             <td className="px-6 py-4 text-xs text-slate-500">{user.Email || user.email || 'N/A'}</td>
                                             <td className="px-6 py-4 text-xs text-slate-500">{user.Phone || user.phone || 'N/A'}</td>
-
-                                            {/* Permissions */}
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-center gap-1.5">
                                                     <button
@@ -267,15 +232,12 @@ const ManageUsers = () => {
                                                     </button>
                                                 </div>
                                             </td>
-
-                                            {/* Actions */}
-                                   
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-10 text-slate-400 text-sm">
+                                    <td colSpan={7} className="text-center py-10 text-slate-400 text-sm">
                                         No {activeTab} users found.
                                     </td>
                                 </tr>
@@ -287,7 +249,6 @@ const ManageUsers = () => {
                 {/* Pagination UI Section */}
                 {!loading && !error && searchedUsers.length > 0 && (
                     <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 dark:bg-slate-800/20">
-                        {/* Data Info */}
                         <div className="text-sm text-slate-500 dark:text-slate-400">
                             Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{indexOfFirstItem + 1}</span> to{' '}
                             <span className="font-semibold text-slate-700 dark:text-slate-200">
@@ -296,13 +257,11 @@ const ManageUsers = () => {
                             of <span className="font-semibold text-slate-700 dark:text-slate-200">{searchedUsers.length}</span> entries
                         </div>
 
-                        {/* Pagination Buttons */}
                         <div className="flex items-center gap-1">
-                            {/* Previous Button */}
                             <button
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className={`p-2 rounded-lg border border-slate-200 dark:border-slate-700 transition-all cursor-pointer ${currentPage === 1
+                                onClick={() => handlePageChange(safeCurrentPage - 1)}
+                                disabled={safeCurrentPage === 1}
+                                className={`p-2 rounded-lg border border-slate-200 dark:border-slate-700 transition-all cursor-pointer ${safeCurrentPage === 1
                                     ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400'
                                     : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
                                     }`}
@@ -310,23 +269,15 @@ const ManageUsers = () => {
                                 <ChevronLeft size={16} />
                             </button>
 
-                            {/* Page Numbers */}
                             {Array.from({ length: totalPages }, (_, index) => {
                                 const pageNumber = index + 1;
-
-                                let startPage = Math.max(1, currentPage - 4);
-                                let endPage = Math.min(totalPages, startPage + 9);
-
-                                if (endPage - startPage < 9) {
-                                    startPage = Math.max(1, endPage - 9);
-                                }
 
                                 if (pageNumber >= startPage && pageNumber <= endPage) {
                                     return (
                                         <button
                                             key={pageNumber}
                                             onClick={() => handlePageChange(pageNumber)}
-                                            className={`px-3 py-1.5 text-sm font-medium rounded-lg cursor-pointer transition-all ${currentPage === pageNumber
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-lg cursor-pointer transition-all ${safeCurrentPage === pageNumber
                                                 ? 'bg-blue-600 text-white shadow-md'
                                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                                 }`}
@@ -338,11 +289,10 @@ const ManageUsers = () => {
                                 return null;
                             })}
 
-                            {/* Next Button */}
                             <button
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className={`p-2 rounded-lg border border-slate-200 dark:border-slate-700 transition-all cursor-pointer ${currentPage === totalPages
+                                onClick={() => handlePageChange(safeCurrentPage + 1)}
+                                disabled={safeCurrentPage === totalPages}
+                                className={`p-2 rounded-lg border border-slate-200 dark:border-slate-700 transition-all cursor-pointer ${safeCurrentPage === totalPages
                                     ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400'
                                     : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
                                     }`}

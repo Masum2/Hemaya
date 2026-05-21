@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11806.211
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecurityAdminHost", "SecurityAdminHost\SecurityAdminHost.csproj", "{BA32A829-6298-4816-87B2-F48D1868A827}"
+EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "securityadmin", "C:\Users\Masum Billah\source\repos\SecurityAdmin\securityadmin.esproj", "{E01B1AA0-1E49-96CD-5F44-38448722C1CA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BA32A829-6298-4816-87B2-F48D1868A827}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA32A829-6298-4816-87B2-F48D1868A827}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA32A829-6298-4816-87B2-F48D1868A827}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA32A829-6298-4816-87B2-F48D1868A827}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E01B1AA0-1E49-96CD-5F44-38448722C1CA}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F6EF81BC-79AE-4CED-9D46-3ECF2410D544}
+	EndGlobalSection
+EndGlobal
