@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\SecurityAdmin\securityadmin.esproj" />
+		<ProjectReference Include="..\securityAdmin\securityadmin.esproj" />
 	</ItemGroup>
 
 	<ItemGroup>
