@@ -1,37 +1,27 @@
-import axios from 'axios';
-import type { AppUser } from './manage-users/userTypes';
+import axios from "axios";
+import type { AppUser } from "./manage-users/userTypes";
 
-
+// ডটনেটের পোর্ট ডাইনামিকালি ডিটেক্ট করার জন্য window.location.origin ব্যবহার করা হলো
+const API_BASE = window.location.origin;
 
 export const userService = {
-  
     getUserList: async (): Promise<AppUser[]> => {
-       
-        const response = await axios.get('/api/SecurityAdmin/GetUserList', {
-
+        // এখানে ইউআরএল-টি Absolute করে দেওয়া হলো
+        const response = await axios.get(`${API_BASE}/api/SecurityAdmin/GetUserList`, {
             withCredentials: true,
-
             headers: {
-
-                'accept': '*/*'
-
+                Accept: "application/json"
             }
-
         });
+
         const resData = response.data;
+        console.log("API Response:", resData);
 
-        console.log("Clean API Response Data:", resData);
-
-      
-        if (resData && Array.isArray(resData.Data)) return resData.Data;
+        if (Array.isArray(resData?.Data)) return resData.Data;
         if (Array.isArray(resData)) return resData;
-        if (resData && Array.isArray(resData.data)) return resData.data;
-        if (resData && Array.isArray(resData.appUserData)) return resData.appUserData;
-        if (resData && Array.isArray(resData.result)) return resData.result;
+        if (Array.isArray(resData?.data)) return resData.data;
+        if (Array.isArray(resData?.result)) return resData.result;
 
-        console.warn("Expected an array but got a different structure.");
         return [];
     }
 };
-
-

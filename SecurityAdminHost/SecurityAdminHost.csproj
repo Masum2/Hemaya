@@ -17,14 +17,17 @@
 		<PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" />
 	</ItemGroup>
 
-	<!-- Auto Start React -->
-	<Target Name="StartReactDevServer"
-			BeforeTargets="Build"
-			Condition="'$(Configuration)' == 'Debug'">
+	<!-- এক কমান্ডে ব্যাকগ্রাউন্ডে রিঅ্যাক্ট ডেভ সার্ভার রান করার স্ক্রিপ্ট (No Window Popup) -->
+	<Target Name="StartSpaServer" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Debug'">
+		<Exec Command="npm install" WorkingDirectory="$(SpaRoot)" Condition="!Exists('$(SpaRoot)node_modules')" />
+		
+		<!-- পোর্ট ৮৪০৮০ অলরেডি বিজি থাকলে এটি এরর দেবে না, জাস্ট ডটনেটকে রান হতে দেবে এবং উইন্ডোজ হাইড রাখবে -->
+		<Exec Command="netstat -ano | findstr 54080 >nul &amp;amp;&amp;amp; (echo React server is already running.) || (start /B npm run dev)" WorkingDirectory="$(SpaRoot)" ContinueOnError="true" />
+	</Target>
 
-		<Exec WorkingDirectory="$(SpaRoot)"
-			  Command="cmd /c start npm run dev" />
-
+	<!-- প্রোডাকশন পাবলিশের জন্য স্ক্রিপ্ট -->
+	<Target Name="PublishSpa" AfterTargets="ComputeFilesToPublish">
+		<Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
 	</Target>
 
 </Project>

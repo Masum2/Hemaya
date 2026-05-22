@@ -2,15 +2,21 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.IO;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.SpaServices;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddHttpClient("AzureProxy");
 
 // Service and CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:54080", "http://localhost:5205")
+        policy.WithOrigins("http://localhost:5205")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -18,26 +24,26 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddRazorPages();
-builder.Services.AddSpaStaticFiles(options =>
-{
-    options.RootPath = "../securityadmin/dist";
-});
-
-// HttpClient configuration without automatic cookies
-builder.Services.AddHttpClient("AzureProxy")
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-    });
+builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseCors();
 app.UseRouting();
+app.UseAuthorization();
 
-// Reverse proxy middleware
+app.MapRazorPages();
+
+
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.Value?.StartsWith("/api", StringComparison.OrdinalIgnoreCase) == true)
@@ -48,29 +54,39 @@ app.Use(async (context, next) =>
         var targetUrl = $"https://pechangatesthemaiya.azurewebsites.net{context.Request.Path}{context.Request.QueryString}";
         var requestMessage = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
 
-        // Copy request body for non-GET requests
-        if (context.Request.Method != "GET" && context.Request.Method != "HEAD")
+        
+        if (!HttpMethods.IsGet(context.Request.Method) &&
+            !HttpMethods.IsHead(context.Request.Method) &&
+            !HttpMethods.IsDelete(context.Request.Method))
         {
-            requestMessage.Content = new StreamContent(context.Request.Body);
+            context.Request.EnableBuffering();
+            var streamContent = new StreamContent(context.Request.Body);
+            requestMessage.Content = streamContent;
         }
 
-        // Copy headers except Host and Cookie
         foreach (var header in context.Request.Headers)
         {
             if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) ||
-                header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
+                header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)) 
                 continue;
 
-            if (header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase) && requestMessage.Content != null)
-                requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+            if (header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+            {
+                if (requestMessage.Content != null)
+                {
+                    requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                }
+            }
             else
+            {
                 requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+            }
         }
 
         requestMessage.Headers.Host = "pechangatesthemaiya.azurewebsites.net";
 
-        // Custom cookie injection
-        string freshLiveCookie = "ARRAffinity=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; ARRAffinitySameSite=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; .AspNetCore.Antiforgery.cdV5uW_Ejgc=CfDJ8LbtibfgVHBJjONX366BUVm2i-YMzrfsKboLXidJMQrRDXV_V34CBzKqKyQhwvUKNTfeldDbTyCzl8lopVr9jjOMUsVGUrXAssEhOILivaKarw7JRprlLBnP5FJCB7z5VoNjdU7G5K_N_E71pT4uIIY; .AspNetCore.Session=CfDJ8LbtibfgVHBJjONX366BUVkbQ%2B3fnya5HDVfjFZqRCO%2BvKqP1M6gjHuQcoq4WQFz07NtFkDR%2BeWUgyHCT9EyrwRdPf8XXVKvwP%2FDoRWTt8IGOi4xDdzgbHGovH0GS%2B8%2B6cQ7hS7G%2BX%2FRCZowkj5ubtuK3Ff0TQpW%2FBShDdCdgtbv; .AspNetCore.Cookies=CfDJ8LbtibfgVHBJjONX366BUVkzh78bMFfOuRXieor37CGiHArfDKQXndFYCvhGhGp_W5QlcUsZkXGMlfK4bF7SiopefT2RDPuUPF3GusoCwEqn2TLNgHM4jXvxeoaM_nZ9JBqWzq_zz17RwFHI2Yr7YH5NK8TOoGt5_yWfh-OHRxv-mLiwDrTYH7VgN2kdbU8Lyzi1MOLdQvsUDAdc_narSRwHectzPGOoN5kqaDquD-cLS09SVCU8TqtxOoGgipCd33ved9qW3qmGhi7z2xSt7Plw5DrO_skR1nwFv1qphmieUzfycxisj_er4XAW-WlS4KMvQaF5svMfoMOWEjSy2JeS-oa4aWllDhF9SFe5keVOqWbTzNnNJqExEQc1_vqgdIhAvLO1olxi169GH3OOoDH3avyIiuaKbzjFODJ4gSiMWRe69PdhNzYDJC3tUuTiF4y9gKigjofVlNs-mbRbFHB8ly4n0euT9TBXq1drKbvYo18txDSXpvCLbcUTVzu3lUoH0qaplaudTBJP_fqjnKP6YV1V7zaSmDg8IA73fVxOoKlXWxUeAwlq39U2eHp4avE4mCjd8dyM-hk2-pANyyPht2pGR-shBHaw5WOuiM7GppRtAX2m5l-ywL01gu0Twil6UtvC0L3ILMLjX2Cg9TGZwKoH6oYHywZDtxzcHhU6dCpAqV1ZRemzdcgptXRNaK0qBewCoHnJQp6zY1c-7LMcSNypco7p5ENtxxwpdxDCMKz4RuPDFu60NeyMjbxDdrQG9FqpOIorozqOwFFoYMBj60NnT5SkiMkZiSMN9EWmpjhndnk1JL1qAqAh0IZqX3lTNd4bhEHJEZy_4A3X57DXMDXoJmJa8mcG5tf7KIJ_gMCFCmnpaPjbkEGngn9CUktS-L3DIQpklw9oM7nhfcuA1p0esvobNFA5Ib2FT-Q7HpWaKYDW2yMK4w-wKE9M6awFEChbep2BjHp4mQyanMsMNg3zifisWQ1tCuVHcdVEN6jgbA7Q00KIIhspMc4-sFNdBq8IUC6uV-QgGarOzpUIv2RZUHANZ9IxvBNIk3GR3rhqDCd2AOw1-xwgbIVoViJN-7ujL3OU7P08_RD3xfP8wH2dJolW30QLmiEWEHqyEXbKVjAwCViuDjNnkt1fuDphcOJ4k7IW1WPe8e3zo8DfIQJRXfEliEsNzh5GqKEFhkkNO8OfksfyQmjrv0_gswf4FnVRXo7hCvL3QE7K9RwNH3RvkvgFFLvRrvt0qkOTaDwByG5P8z9LqYsWiezxIXsGg3-amd1Ruw_IjThmYiOwPaJk94z3_QMbiYSLwxpUnkDEakh6LOaXZax1wKFbWhPVIcktV2fVtikZ8RtqoDSO1_1r9LgEqZYioN8E7fUVe1l0Nakan9tI894SK5pl7DLHoVpGXcDjFMxBAF-kKjHK5ixIn4cRem6wLjAmbF-gEy1VWUEgfrfZ8QYxSdbLGhQiTuFC71o2DYtV2U34dLt8nNjO8epLRnDD79eDx7SxNeWy5VUToVkK3yo9KEORtzXlSPf7vSA9Vsu478ZNZa51kMQjqMm43plQWxQCcSl7r1f47Nn16xFrlaRHArmX0I80Yi7F6W-6seNnvNYiiXDBZmSbgzQs0utXeSMaNglDSFnsbpgUPqL0LjN2bbs_N6SikgSY3OF6a9EfUbUvIhGYzDlpNKewM9woAMlYbcezIB1pt2509h1p5NFi3rZ4OT4jFK1QyxGNcUR7a2g-n95Mb3nF7wmWbBLbzikcFOBN-b64O19yEfEWalKJJwRfcX_OdkC07Zm9BC_-8Z385QQP_XEGnaF19IPAnDsGM50RDYr-W_8cljl3H3MK57TUvP3KUH-dbC0YRQlUlMqmL-udc0xvrSk41OAAG7m5Gux6MW-LVAlno2zbfdcypSYLgfpnV68NkmkTO51Mh7FtMZSIf54b_aWnRkZQyI0y5-rG3LS4s5guoK3_AAYAjn9kYcHJKjltPPStEhjSfjdCswCwlG5cgNKqjNnXyeNMuAEQfx-_ClXdmAq-csOYzxRTeiItO_DFBr3bcHqqkAOVOrvOml0CYCrOwki-xO91BXZ3K3ObafOVQ3tUA469aGuhbrkvCNOFHM3VIlZA1Q5FMQJv5b9Atwwx_5-UilvKIM_6pt-GDwNMwv64aTBtWD103GH3nNZ1OIe7h1n25AROiDFRrwYUtcHP3QIrmARDNa-LHW4WGnvw2yz_ByBoJgrToSpcHGZhA29B2dEwkbdk2VoKBG8CzOYzKIUw9nsyLzIePrk0lNd1z4UTIb23WFN2ix2AsTwTnlPuRPwyntPYwt9-k82K32VYhjlkHwor-NJEBBhWBMZesvRIoSLMbYpemXD3Ml3o8pU5zVfT7ZBE5YI";
+      
+        string freshLiveCookie = "ARRAffinity=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; ARRAffinitySameSite=a6e48b9e9d2653435be7b61998d8624b44115214104213d6c8b8c526cc56dc70; .AspNetCore.Antiforgery.cdV5uW_Ejgc=CfDJ8LbtibfgVHBJjONX366BUVm5_HXRK0WcIXigcB2jZuPGr7w3Oal5dwf8N-nMBNCVxovWLA1gYAO1uXJzXx40ZG95ZbyyjAeLGd88RdcuAnLE0Bl0dXViQLJLyu_PLlscKwl-PipdsN2i2MYgmXjYRCA; .AspNetCore.Cookies=CfDJ8LbtibfgVHBJjONX366BUVlycKaM_FvM7EEp_aBFDarX1b5v6TYf5wDbtJ4n6rTnokekAzvEGEBig1pfDedWquhzjUMcgbaJZIv8I6rvmuiujXKLk3JZ2-_XUXXUJWmy-tgIXQQhZWouwfMwfpx5FGTiKyJ7FOqv0wsk4MCGPS32_7PbRArYn3ON6cUsviBPFiL99Z1P3_JQS-Jnyq4zeLF3Jea0x0CdrIIoj9Cgw95UvpV-HiFOwbnnPZZ0pZbFg615oqQZnnUHLOcPYbgrXoEMwxrBgAwpIKosdpu5weqQ4XtIk8S7px_YqlNriVglg_lKpLJS9As69BrlPF-ctitrtYj70A8e6xbzcINKPpjg3WCGnu3a3SP2Q_XkOurA__C3AW5lmOCSKBpLtYTZeTsUSgLds1P1A5WWgpLeIrfimrgBkiOZ6J8wTsob1yD6NMbvQK8P5a0LAS9wz643c2DJOlGD1kz-uwZnm0gWyWHmybECFUFldeED8KwpvC7QW2S20WGrY99jkA-5B6_LxDbmB8YbqwuVqzc4fzuA1G8VKhJwC0QzSEgIWDK9sJEmUhS1xvkCrUyhVwzcShaI69iLfwitA25LoLkeakYHd4TtXEKfDT5oJliYnkPPovM9KDKmN0aIDo2rw9ouMmPZl8-NFnO-g7hDyBTPPSdnLd0kVhY2WY53mqV0ObpHhcLxqY5mP-2LNYsv28XDeaZEa0ji1HhKLZ3MIDrMCnASSgcoF1lxEbcuhSD0Ql7lmRNXPc9KDD3zm0Y7yz-Xe3s-lUyr6nqbUSWUxi_C3RqRqmCBslcBddcs2gaCY96oPQ01nr3OI_VrLfmdVvfgtgC9JJTkIiZW653Hf4Huc51C-eHbE10k38gNPCeqR2K6C6qXUlpKUo4HBsbCnlbwW43P7f2AMcO1iM-joo2ZwneKK8kHHWx2cg_57hzHwIbWgtMvo8iUhkUHghQgV89CKGH0FGXcGZizyI1t64gERYUAhzGmuDOfYo-fiF-7YQWQUZErJgi-O47AszzMg28S8LUMqG17EI5mnX2TO2KbDvX0RpRebHGIeR3DT1C1M_KCTaHn0E7N4HsGWIlQ7XGTSpowKpx9LjvHD9JtdmA7bVFhWOwLbtNFioy_-XTAB3Bfa__zGMKbvpuG7rbhPp8kUz-_07W139pzLJqgWsM8lVYL39c-XzZQaIkMIUSY76glNYXbSqijmpVtjWKs1ZNM018xyIL-T3wkI8c0djQIJ2wvanHDWf6brCuXAqtgRhHa9lEHzftZ0cqjFOsL_eXbWbqQJuoyBddjywG3RO75KbRbLqj5CnCvHXkJqlUFd1k3-PWSkZq4lVsl89e9_EwESi37pkv6vi599AmQxuKhB1_0f3aG98fA_SrHFmiXL1IxL5AxAvK8RgiJKybhF-keg4XL3-70m9XFknwjPfd7ykHLzQf1Ay7Rb93Rcj-uhExk7tK75S3JKZnd0FsxS4KEkhAmzPMYzML6tk6wffANBNIgatoGAI4cgBk0R_Yzi1-mZqa54LRFVyYDySnE7eoCkPDeUGlCtSl49EkMKlTWbz2eEu74XP_XVNQ7_9JbA0qRqNy-4Hfujvl1TFk4cixDp-HVtXKqiGK0t2Qk_kAz7D2ob4mOigP433gKqjc-ZrluxcY3_Cx-Jdap5AcJEQ_bmxKRp76QqCr8eAOOjO5k7J1w0hzOQReJGzmGLS4td7gwSG21sapkq9jrki3mdcmMwzWXAShn4fxlP-GUth5n__lt22IxRJxEjKlMORiEpipL95KNKEf0A0_RLIejHVgXFjyDZ51Qoe4kvfNjsmn0Y1Ndnu9WcBvoPl1dk9qCllOsyxzrL3zfTBu8o0ABh8Nsao8kBDtsIE-Y0-MCjpgNgG4isTvzy_ha9BROPFKMCCdRaBev9ge1FMzVqh0YLpOCeUuJAVw8gg_2c4HHybZY6p42nyxkfryAUcyI9L7rnK3tcjBaWTABXd6JF6c8adw2l04TFgvI_UvOBdwlmwK1U4yC-EajhrrGS5XCyT0DMcPoErTmcF9lOWyADyTqrK5cXYGGnhU_O-xZJ2yHZubrtaWb4MJuyr1g71Gf3xcltyRnzXs7gCMV3Op35DBQJxTzeQO3Dq3wOsNr4jyb8gNNLB0UkyLkumz1HzN5lg4nmJtwGWHiAytRjlJtafZMrP5eXzEpo7Y-YQz_ZBrC3sik5dRnEbvjY0VDIU4RhHGLwh5q9kP8Ut_rxhDBG4PuEDHhZhGrEWKJbPKZxWR0NeGkxXKzcIh2_6RogqeUea4O2XJ9m5JXo3lEg4a1a9C4apX8qTt86XUiwdTC0A2pWaxRtZD5M_oqC3wLHNMBgq3E24U1hAfGn9QScyYFf1ZxFzq3xVzn21g; .AspNetCore.Session=CfDJ8LbtibfgVHBJjONX366BUVn5iaZyMYVEQIhUo3BEPp2mkJLjIz0fk35vBlcgdrq93GinKxwy2EnadOv0s2ho9HjhjFPmlBdCAQA6FdyBXKZFLRq7iLX%2FbPTyarzwzca57ySa3%2FI63Hnvm6MOA9XuNmC8iMR6EBGrchdW0QHEPJQj";
 
         requestMessage.Headers.TryAddWithoutValidation("Cookie", freshLiveCookie);
 
@@ -78,7 +94,6 @@ app.Use(async (context, next) =>
 
         context.Response.StatusCode = (int)responseMessage.StatusCode;
 
-        // Copy response headers
         foreach (var header in responseMessage.Headers)
         {
             if (!header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) &&
@@ -100,17 +115,25 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapRazorPages();
 
-if (app.Environment.IsDevelopment())
+app.MapWhen(context => context.Request.Path.StartsWithSegments("/admin"), adminApp =>
 {
-    app.UseSpa(spa =>
-    {
-        spa.Options.SourcePath = "../securityadmin";
-        spa.UseProxyToSpaDevelopmentServer("http://localhost:54080");
-    });
-}
+    adminApp.UseStaticFiles();
 
-app.MapFallbackToPage("/admin/{**path}", "/Admin");
+    adminApp.UseSpa(spa =>
+    {
+        if (app.Environment.IsDevelopment())
+        {
+        
+            spa.UseProxyToSpaDevelopmentServer("http://localhost:54080");
+        }
+        else
+        {
+            spa.Options.SourcePath = "wwwroot/admin";
+        }
+    });
+});
+
+app.MapFallbackToFile("admin/index.html");
 
 app.Run();

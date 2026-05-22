@@ -27,7 +27,7 @@ const ManageWidgets = () => {
         assignedWidgets,
         readyWidgets,
         userInfo,
-        refetch,
+      
         setAssignedWidgets,
         setReadyWidgets
     } = useGetUserWidgets(appUserIdNum, selectedModuleId);
@@ -65,7 +65,7 @@ const ManageWidgets = () => {
         if (success) {
             setIsModalOpen(false);
             setWidgetToDelete(null);
-            await refetch();
+           
         }
     };
 
@@ -74,14 +74,14 @@ const ManageWidgets = () => {
         const success = await assignSingleWidget(widget.WidgetComponentId, widget.WidgetType);
         if (success) {
             toast.success(`"${meta.name}" assigned successfully!`);
-            await refetch();
+       
         }
     };
 
     const handleAssignAllWidgets = async () => {
         const success = await assignAllAvailableWidgets(readyWidgets);
         if (success) {
-            await refetch();
+            // await refetch();
         }
     };
 
