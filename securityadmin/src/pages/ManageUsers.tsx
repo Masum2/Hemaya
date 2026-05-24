@@ -216,7 +216,9 @@ const ManageUsers = () => {
                                                     >
                                                         <Grid size={12} /> Widgets
                                                     </button>
-                                                    <button className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-600 text-[10px] cursor-pointer font-bold rounded uppercase border border-rose-100 hover:bg-rose-100 transition-colors">
+                                                    <button 
+                                                    onClick={() => navigate(`/users/privileges/${userId}`)}
+                                                    className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-600 text-[10px] cursor-pointer font-bold rounded uppercase border border-rose-100 hover:bg-rose-100 transition-colors">
                                                         <ShieldAlert size={12} /> Privileges
                                                     </button>
                                                     <button

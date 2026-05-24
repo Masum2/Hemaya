@@ -12,6 +12,8 @@ import { ToastContainer } from 'react-toastify';
 
 import 'react-toastify/dist/ReactToastify.css';
 import ManageUsers from './pages/ManageUsers';
+import { ManageUserPrivileges } from './pages/ManageUserPrivileges';
+
 function App() {
     return (
         <BrowserRouter basename="/admin">
@@ -22,7 +24,7 @@ function App() {
                     <Route path="privileges" element={<ManageSystemPrivileges />} />
                     <Route path="managesyscon" element={<ManageSystemConfiguration />} />
                     <Route path="/users/widgets/:id" element={<ManageWidgets />} />
-
+ <Route path="/users/privileges/:id" element={<ManageUserPrivileges />} />
                     <Route path="users" element={<ManageUsers />} />
 
                     <Route path="/users/modules/:id" element={<ManageUserModules />} />
