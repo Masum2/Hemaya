@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useGetUserPrivilege } from '../api-hooks/user-privileges/useGetUserPrivilege';
 import { Layers, LayoutGrid, Shield } from 'lucide-react';
 
@@ -7,7 +7,7 @@ import { Layers, LayoutGrid, Shield } from 'lucide-react';
 export const ManageUserPrivileges = () => {
     const { id } = useParams();
     const appUserIdNum = Number(id) || 2; 
-
+ const navigate = useNavigate();
     const {
         loading,
         error,
@@ -113,14 +113,21 @@ console.log("userInfo",userInfo)
              {/* Top Navigation/Tabs */}
                 <div className="flex bg-slate-200/70 p-1 rounded-xl max-w-md shadow-inner">
                    
-                    <button className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg transition-all">
+                    <button 
+                     onClick={() => navigate(`/users/widgets/${id}`)}
+                    className="flex-1 flex items-center cursor-pointer justify-center gap-2 py-2.5 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg transition-all">
                         <Shield size={16} /> Widgets
                     </button>
-                    <button className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg transition-all">
-                        <Layers size={16} /> Modules
-                    </button>
-                     <button className="flex-1 flex items-center justify-center gap-2 bg-white py-2.5 px-4 text-sm font-semibold text-slate-900 rounded-lg shadow-sm border border-slate-200/50 transition-all">
+                  
+                     <button 
+                     onClick={() => navigate(`/users/privileges/${id}`)}
+                     className="flex-1 flex items-center cursor-pointer justify-center gap-2 bg-white py-2.5 px-4 text-sm font-semibold text-slate-900 rounded-lg shadow-sm border border-slate-200/50 transition-all">
                         <LayoutGrid size={16} className="text-indigo-600" /> Privileges
+                    </button>
+                      <button
+                      onClick={() => navigate(`/users/modules/${id}`)}
+                      className="flex-1 flex items-center cursor-pointer justify-center gap-2 py-2.5 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg transition-all">
+                        <Layers size={16} /> Modules
                     </button>
                 </div>
 

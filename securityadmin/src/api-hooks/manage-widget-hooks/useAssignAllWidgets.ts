@@ -27,6 +27,7 @@ interface ErrorResponse {
 export const useAssignAllWidgets = (appUserId: number, selectedModuleId: number | null) => {
     const [loading, setLoading] = useState<boolean>(false);
 
+    // Generic API call mechanism
     const assignWidgets = useCallback(async (widgets: AssignWidgetPayload[]): Promise<boolean> => {
         setLoading(true);
         try {
@@ -38,8 +39,6 @@ export const useAssignAllWidgets = (appUserId: number, selectedModuleId: number 
             };
 
             await assignAllWidgets(requestData);
-
-            toast.success("Widgets assigned successfully!");
             return true;
         } catch (err) {
             const error = err as ErrorResponse;
@@ -53,17 +52,31 @@ export const useAssignAllWidgets = (appUserId: number, selectedModuleId: number 
         }
     }, [appUserId, selectedModuleId]);
 
-    const assignSingleWidget = useCallback(async (widgetComponentId: number, widgetType: number): Promise<boolean> => {
-        return assignWidgets([
+    // Single widget assign method with state callback
+    const assignSingleWidget = useCallback(async (
+        widgetComponentId: number, 
+        widgetType: number,
+        onSuccess?: () => void
+    ): Promise<boolean> => {
+        const success = await assignWidgets([
             {
                 widgetComponentId: widgetComponentId,
                 widgetType: widgetType,
                 isSelected: true
             }
         ]);
+
+        if (success && onSuccess) {
+            onSuccess();
+        }
+        return success;
     }, [assignWidgets]);
 
-    const assignAllAvailableWidgets = useCallback(async (readyWidgets: Widget[]): Promise<boolean> => {
+    // Multiple widgets assign method with state callback
+    const assignAllAvailableWidgets = useCallback(async (
+        readyWidgets: Widget[],
+        onSuccess?: () => void
+    ): Promise<boolean> => {
         if (!readyWidgets || readyWidgets.length === 0) {
             return true;
         }
@@ -78,6 +91,7 @@ export const useAssignAllWidgets = (appUserId: number, selectedModuleId: number 
 
         if (success) {
             toast.success(`All ${readyWidgets.length} widget${readyWidgets.length > 1 ? 's' : ''} assigned successfully!`);
+            if (onSuccess) onSuccess();
         }
 
         return success;

@@ -1,6 +1,6 @@
 // src/pages/ManageSystemConfiguration.tsx
 import React, { useState } from 'react';
-import { PencilIcon, ChevronLeft, ChevronRight, Play, Save, X } from 'lucide-react';
+import { PencilIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Save, X, Settings } from 'lucide-react';
 import { useSystemConfiguration, type ConfigItem } from '../api-hooks/manage-system-configuration-hooks/useSystemConfiguration';
 
 export const ManageSystemConfiguration: React.FC = () => {
@@ -11,7 +11,6 @@ export const ManageSystemConfiguration: React.FC = () => {
     // Edit mode start
     const handleEdit = (item: ConfigItem) => {
         setEditingId(item.id);
-        // এডিট ফর্ম ইনিশিয়ালাইজ করার সময় কারেন্ট ডেটার অবজেক্ট কপি করে নেওয়া হচ্ছে
         setEditForm({ ...item });
     };
 
@@ -24,7 +23,6 @@ export const ManageSystemConfiguration: React.FC = () => {
     // Save changes
     const handleSave = async () => {
         if (editForm) {
-            // হুকের আপডেট ফাংশনে সরাসরি এডিট ফর্মের কারেন্ট স্টেট পাঠানো হচ্ছে
             const success = await updateConfiguration(editForm);
             if (success) {
                 setEditingId(null);
@@ -35,91 +33,116 @@ export const ManageSystemConfiguration: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64 bg-white min-h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-2"></div>
-                <div className="text-gray-600 font-medium text-sm">Loading system configurations...</div>
+            <div className="flex flex-col justify-center items-center min-h-screen bg-[#f8fafc]">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent shadow-md"></div>
+                <div className="text-indigo-600 font-semibold text-sm mt-4 tracking-wide animate-pulse">Loading configurations...</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="p-4 max-w-7xl mx-auto mt-4 bg-red-50 text-red-700 rounded border border-red-200 shadow-sm">
-                <strong>Configuration Error:</strong> {error}
+            <div className="p-4 max-w-7xl mx-auto mt-6 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 shadow-sm flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                <p className="text-sm"><strong>Configuration Error:</strong> {error}</p>
             </div>
         );
     }
 
     return (
-        <div className="p-8 bg-white min-h-screen">
-            <h1 className="text-3xl text-gray-600 font-light mb-6">System Configuration</h1>
+        <div className="p-6 md:p-8 bg-[#f1f5f9] min-h-screen">
+            {/* Header Area */}
+            <div className="max-w-7xl mx-auto mb-8 flex items-center gap-3.5">
+                <div className="p-2.5 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-xl shadow-md shadow-indigo-200 text-white">
+                    <Settings size={22} className="animate-spin-[spin_3s_linear_infinite]" />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-600 bg-clip-text text-transparent tracking-tight">
+                        System Configuration
+                    </h1>
+                    <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">Manage and update global system variables and live statuses.</p>
+                </div>
+            </div>
 
-            <div className="border border-gray-300 rounded shadow-sm overflow-hidden">
-                <div className="bg-[url('https://www.transparenttextures.com/patterns/graphy.png')] bg-gray-50/20">
+            {/* Table Container */}
+            <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-md shadow-slate-100 overflow-hidden">
+                <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-white/90 border-b border-gray-300">
-                                <th className="p-4 font-bold text-gray-800 text-sm">Configuration</th>
-                                <th className="p-4 font-bold text-gray-800 text-sm">Status</th>
-                                <th className="p-4 font-bold text-gray-800 text-sm">Config Value</th>
-                                <th className="p-4 w-48"></th>
+                            <tr className="bg-gradient-to-r from-slate-50 to-blue-50/40 border-b border-slate-200">
+                                <th className="p-4 font-bold text-slate-700 text-xs uppercase tracking-wider pl-6">Configuration</th>
+                                <th className="p-4 font-bold text-slate-700 text-xs uppercase tracking-wider w-40">Status</th>
+                                <th className="p-4 font-bold text-slate-700 text-xs uppercase tracking-wider w-48">Config Value</th>
+                                <th className="p-4 w-44 text-right pr-6">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100">
                             {data.map((item) => (
-                                <tr key={item.id} className="border-b border-gray-200 bg-white/40 hover:bg-white/60 transition-colors">
+                                <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors group">
                                     {/* Configuration Name */}
-                                    <td className="p-4 text-gray-700 text-sm font-medium">{item.configuration}</td>
+                                    <td className="p-4 text-slate-900 text-sm font-semibold pl-6 border-l-4 border-transparent group-hover:border-indigo-500 transition-all">
+                                        {item.configuration}
+                                    </td>
 
-                                    {/* Status Column - এখন সরাসরি true/false দেখাবে */}
-                                    <td className="p-4 text-gray-700 text-sm font-mono">
+                                    {/* Status Column */}
+                                    <td className="p-4 text-sm">
                                         {editingId === item.id ? (
-                                            <input
-                                                type="checkbox"
-                                                className="w-4 h-4 cursor-pointer accent-blue-600"
-                                                // ফর্মের কারেন্ট স্ট্যাটাস চেকড বা আনচেকড অবস্থায় থাকবে
-                                                checked={editForm?.status ?? false}
-                                                onChange={(e) => setEditForm(prev => prev ? { ...prev, status: e.target.checked } : null)}
-                                            />
+                                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={editForm?.status ?? false}
+                                                    onChange={(e) => setEditForm(prev => prev ? { ...prev, status: e.target.checked } : null)}
+                                                />
+                                                <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                <span className="ml-2 text-xs font-bold text-indigo-600">
+                                                    {(editForm?.status ?? false) ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </label>
                                         ) : (
-                                            // আপনার চাওয়া অনুযায়ী সরাসরি true অথবা false টেক্সট রেন্ডার হচ্ছে
-                                            <span className={item.status ? "text-green-600 font-semibold" : "text-red-500 font-semibold"}>
-                                                {item.status.toString()}
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
+                                                item.status 
+                                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm shadow-emerald-50" 
+                                                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                                            }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${item.status ? 'bg-emerald-500 shadow-sm shadow-emerald-400' : 'bg-rose-400'}`}></span>
+                                                {item.status ? 'True' : 'False'}
                                             </span>
                                         )}
                                     </td>
 
-                                    {/* Config Value Column - টাইপ টেক্সট দিয়ে কনভার্ট করা হয়েছে যাতে টাইপ করতে প্রবলেম না হয় */}
-                                    <td className="p-4 text-gray-700 text-sm">
+                                    {/* Config Value Column */}
+                                    <td className="p-4 text-sm">
                                         {editingId === item.id ? (
                                             <input
                                                 type="text"
-                                                className="border border-blue-400 px-2 py-1 rounded w-24 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                                className="border-2 border-indigo-100 px-3 py-1.5 rounded-xl w-full max-w-[140px] text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 font-mono shadow-inner bg-slate-50 transition-all"
                                                 value={editForm?.value ?? ''}
-                                                // ইনপুট ভ্যালু চেঞ্জ হওয়ার সাথে সাথে স্টেট আপডেট হচ্ছে
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     setEditForm(prev => prev ? { ...prev, value: val === '' ? 0 : Number(val) } : null);
                                                 }}
                                             />
                                         ) : (
-                                            <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-800">{item.value}</span>
+                                            <span className="font-mono bg-indigo-50/50 border border-indigo-100/70 px-2.5 py-1 rounded-lg text-indigo-700 text-xs font-bold">
+                                                {item.value}
+                                            </span>
                                         )}
                                     </td>
 
                                     {/* Actions Column */}
-                                    <td className="p-2">
+                                    <td className="p-4 text-right pr-6">
                                         {editingId === item.id ? (
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 justify-end">
                                                 <button
                                                     onClick={handleSave}
-                                                    className="flex items-center gap-1 bg-[#5cb85c] text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors shadow-sm"
+                                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-200"
                                                 >
                                                     <Save size={14} /> Save
                                                 </button>
                                                 <button
                                                     onClick={handleCancel}
-                                                    className="flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors shadow-sm"
+                                                    className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all shadow-sm"
                                                     type="button"
                                                 >
                                                     <X size={14} /> Cancel
@@ -128,10 +151,10 @@ export const ManageSystemConfiguration: React.FC = () => {
                                         ) : (
                                             <button
                                                 onClick={() => handleEdit(item)}
-                                                className="flex items-center gap-2 bg-[#5cb85c] text-white px-4 py-1 rounded text-sm hover:bg-green-600 transition-colors shadow-sm"
+                                                className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 active:scale-95 transition-all shadow-sm group-hover:shadow-indigo-50"
                                                 type="button"
                                             >
-                                                <PencilIcon size={14} /> Edit
+                                                <PencilIcon size={13} className="text-slate-400 group-hover:text-indigo-500 transition-colors" /> Edit
                                             </button>
                                         )}
                                     </td>
@@ -142,17 +165,27 @@ export const ManageSystemConfiguration: React.FC = () => {
                 </div>
 
                 {/* Pagination */}
-                <div className="bg-[#f5f5f5] p-2 flex items-center justify-between text-xs text-gray-600 border-t border-gray-300 select-none">
-                    <div className="flex items-center gap-2">
-                        <div className="flex gap-1 items-center">
-                            <button className="p-1 text-gray-400 cursor-not-allowed" disabled><Play className="rotate-180 fill-current" size={10} /></button>
-                            <button className="p-1 text-gray-400 cursor-not-allowed" disabled><ChevronLeft size={16} /></button>
-                            <span className="bg-[#2b78c5] text-white px-2.5 py-1 rounded font-bold">1</span>
-                            <button className="p-1 text-gray-400 cursor-not-allowed" disabled><ChevronRight size={16} /></button>
-                            <button className="p-1 text-gray-400 cursor-not-allowed" disabled><Play className="fill-current" size={10} /></button>
-                        </div>
+                <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 px-6 py-3.5 flex items-center justify-between text-xs text-slate-500 font-medium border-t border-slate-200 select-none">
+                    <div className="flex items-center gap-1.5">
+                        <button className="p-1.5 text-slate-300 cursor-not-allowed rounded-lg hover:bg-slate-100" disabled>
+                            <ChevronsLeft size={14} />
+                        </button>
+                        <button className="p-1.5 text-slate-300 cursor-not-allowed rounded-lg hover:bg-slate-100" disabled>
+                            <ChevronLeft size={14} />
+                        </button>
+                        
+                        <span className="bg-gradient-to-br from-indigo-600 to-blue-600 text-white px-3 py-1 rounded-lg font-bold mx-1 shadow-md shadow-indigo-100">1</span>
+                        
+                        <button className="p-1.5 text-slate-300 cursor-not-allowed rounded-lg hover:bg-slate-100" disabled>
+                            <ChevronRight size={14} />
+                        </button>
+                        <button className="p-1.5 text-slate-300 cursor-not-allowed rounded-lg hover:bg-slate-100" disabled>
+                            <ChevronsRight size={14} />
+                        </button>
                     </div>
-                    <div className="pr-4 italic">1 - {data.length} of {data.length} items</div>
+                    <div className="font-semibold text-slate-500">
+                        Showing <span className="text-indigo-600 font-bold">1 - {data.length}</span> of <span className="text-slate-800 font-bold">{data.length}</span> configurations
+                    </div>
                 </div>
             </div>
         </div>
